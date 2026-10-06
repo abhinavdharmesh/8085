@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8085 Microprocessor Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: #737373; /* Neutral gray matching the provided software */
+            margin: 0;
+            padding: 10px;
+        }
+
+        /* Digital display styling */
+        .digital-display {
+            font-family: 'Share Tech Mono', monospace;
+            background-color: #7f1d1d; /* Dark red background */
+            color: #ef4444; /* Bright red text */
+            text-shadow: 0 0 5px #ef4444;
+            white-space: pre;
+        }
+
+        /* Keypad button styling */
+        .key-btn {
+            background-color: #f3f4f6;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 1.125rem;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            user-select: none;
+        }
+        .key-btn:hover { background-color: #e5e7eb; }
+        .key-btn:active { background-color: #d1d5db; transform: translateY(1px); }
+        .key-btn.hex-key { background-color: #111827; color: white; border-color: #374151; }
+        .key-btn.hex-key:hover { background-color: #1f2937; }
+        .key-btn.hex-key:active { background-color: #374151; }
+
+        /* Toolbar buttons */
+        .tb-btn {
+            font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 4px;
+            border: 1px solid #9ca3af; background: #f9fafb; color: #111827; cursor: pointer; white-space: nowrap;
+        }
+        .tb-btn:hover { background: #e5e7eb; }
+        .tb-btn:disabled { opacity: .45; cursor: not-allowed; }
+        .tb-btn.primary { background: #2563eb; border-color: #1d4ed8; color: #fff; }
+        .tb-btn.primary:hover { background: #1d4ed8; }
+        .tb-btn.go { background: #16a34a; border-color: #15803d; color: #fff; }
+        .tb-btn.go:hover { background: #15803d; }
+        .tb-btn.stop { background: #dc2626; border-color: #b91c1c; color: #fff; }
+        .tb-btn.stop:hover { background: #b91c1c; }
+
+        /* Tabs */
+        .tab-btn { font-size: .75rem; font-weight: 700; padding: 5px 12px; border: 1px solid #9ca3af; border-bottom: none; background: #e5e7eb; color: #4b5563; cursor: pointer; border-radius: 4px 4px 0 0; margin-right: 2px; }
+        .tab-btn.active { background: #fff; color: #111827; }
+
+        /* Registers */
+        .reg-cell { display: flex; align-items: center; gap: 4px; font-family: ui-monospace, monospace; font-size: .85rem; }
+        .reg-cell span { width: 14px; font-weight: 700; color: #374151; }
+        .reg-in { width: 100%; min-width: 0; text-align: center; font-family: ui-monospace, monospace; border: 1px solid #9ca3af; padding: 1px 2px; text-transform: uppercase; background: #fff; }
+        .reg-in.chg { background: #fef08a; }
+        .reg-in:focus { outline: 2px solid #3b82f6; }
+        td.flag-cell { cursor: pointer; user-select: none; }
+        td.flag-cell:hover { background: #dbeafe; }
+        td.flag-cell.on { background: #fecaca; font-weight: 700; color: #991b1b; }
+
+        /* LEDs */
+        .led { display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #450a0a; border: 1px solid #7f1d1d; vertical-align: middle; }
+        .led.on { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+        .led.sw { background: #14532d; border-color: #166534; cursor: pointer; width: 15px; height: 15px; }
+        .led.sw.on { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+        .led.amber.on { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+        .led.amber { background: #451a03; border-color: #78350f; }
+
+        /* Editor + gutter */
+        .editor-wrap { display: flex; border: 2px solid #d1d5db; height: 270px; background: #fff; }
+        .gutter { width: 54px; background: #f3f4f6; border-right: 1px solid #d1d5db; overflow: hidden; padding: 4px 0; font-family: ui-monospace, monospace; font-size: 13px; user-select: none; flex-shrink: 0; }
+        .gutter .gl { height: 20px; line-height: 20px; display: flex; justify-content: flex-end; gap: 4px; padding-right: 6px; color: #9ca3af; cursor: pointer; }
+        .gutter .gl.bp { color: #dc2626; }
+        .gutter .gl.err { background: #fecaca; color: #991b1b; }
+        .gutter .gl.cur { background: #bfdbfe; color: #1d4ed8; font-weight: 700; }
+        #editor { flex: 1; resize: none; border: none; outline: none; font-family: ui-monospace, 'Courier New', monospace; font-size: 13px; line-height: 20px; padding: 4px 8px; white-space: pre; overflow: auto; tab-size: 8; }
+
+        /* Listing */
+        #listing-body td { border: 1px solid #d1d5db; padding: 1px 6px; }
+        #listing-body tr.cur { background: #bfdbfe; font-weight: 700; }
+        #listing-body tr:hover { background: #eff6ff; }
+        #listing-body tr.cur:hover { background: #bfdbfe; }
+        #listing-body td.bp { cursor: pointer; width: 22px; text-align: center; color: #dc2626; }
+        #listing-body td.bp:hover { background: #fee2e2; }
+        #listing-body td.addr { cursor: pointer; }
+        #listing-body td.addr:hover { text-decoration: underline; color: #1d4ed8; }
+
+        /* Memory */
+        .mc { width: 27px; text-align: center; font-family: ui-monospace, monospace; font-size: 12px; border: 1px solid transparent; background: transparent; text-transform: uppercase; padding: 1px 0; }
+        .mc:hover { border-color: #9ca3af; }
+        .mc:focus { outline: 2px solid #3b82f6; background: #fff; }
+        .mc.pc { background: #93c5fd; }
+        .mc.hl { background: #86efac; }
+        .mc.sp { background: #fdba74; }
+        .mc.wr { background: #fde047; }
+
+        .msg-ok { color: #166534; }
+        .msg-err { color: #991b1b; }
+        .ref-row:hover { background: #eff6ff; }
+        kbd { background: #e5e7eb; border: 1px solid #9ca3af; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+
+        body.basic .adv-only { display: none !important; }
+        body:not(.basic) .basic-only { display: none !important; }
+        body.basic #app-container { max-width: 1240px; }
+        .mode-btn { font-size: .7rem; font-weight: 700; padding: 1px 9px; border: 1px solid #9ca3af; background: #f3f4f6; color: #374151; cursor: pointer; }
+        .mode-btn.on { background: #2563eb; color: #fff; border-color: #1d4ed8; }
+        .key-btn.kflash { background-color: #fde047 !important; color: #111827 !important; }
+        #basic-body td, #stack-body td { border: 1px solid #d1d5db; padding: 2px 6px; height: 24px; }
+        #basic-body tr.bcur { color: #2563eb; font-weight: 700; }
+        #basic-body tr.flash { background: #fef08a; }
+    </style>
+</head>
+<body class="basic flex flex-col items-center justify-center min-h-screen gap-2">
+
+    <div id="app-container" class="bg-gray-200 w-full max-w-[1500px] p-4 flex flex-col lg:flex-row gap-4 border border-gray-400 shadow-xl">
+
+        <!-- ================= LEFT PANEL: TRAINER KIT UI ================= -->
+        <div class="lg:w-[480px] shrink-0 bg-white p-4 border border-gray-400 flex flex-col gap-4">
+            <h2 class="text-sm font-bold text-gray-500 bg-gray-300 p-1 -mt-4 -mx-4 border-b border-gray-400 flex items-center justify-between">
+                <span>8085 Trainer Kit</span>
+                <span class="flex" title="Basic: just the trainer kit and debug table. Advanced: editor, I/O, interrupts, memory viewer, trace.">
+                    <button id="mode-basic" class="mode-btn on" onclick="setMode('basic')">Basic</button>
+                    <button id="mode-adv" class="mode-btn" onclick="setMode('adv')">Advanced</button>
+                </span>
+            </h2>
+
+            <!-- Displays -->
+            <div class="flex justify-between gap-4">
+                <div class="flex-1 bg-white p-2 border-2 border-gray-300">
+                    <div id="display-address" class="digital-display text-5xl p-2 text-center tracking-widest h-16 flex items-center justify-center">0000</div>
+                    <div class="text-center text-xs font-bold text-gray-500 mt-1">ADDRESS</div>
+                </div>
+                <div class="w-1/3 bg-white p-2 border-2 border-gray-300">
+                    <div id="display-data" class="digital-display text-5xl p-2 text-center tracking-widest h-16 flex items-center justify-center">00</div>
+                    <div class="text-center text-xs font-bold text-gray-500 mt-1">DATA</div>
+                </div>
+            </div>
+            <div id="kit-hint" class="adv-only text-xs text-gray-600 bg-yellow-50 border border-yellow-200 px-2 py-1 min-h-[2rem]"></div>
+
+            <!-- Keypads -->
+            <div class="flex gap-4">
+                <div class="grid grid-cols-4 gap-2 flex-1 p-2 border-2 border-gray-300 bg-gray-50">
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('C')">C</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('D')">D</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('E')">E</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('F')">F</button>
+
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('8')">8</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('9')">9</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('A')">A</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('B')">B</button>
+
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('4')">4</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('5')">5</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('6')">6</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('7')">7</button>
+
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('0')">0</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('1')">1</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('2')">2</button>
+                    <button class="key-btn hex-key py-3" onclick="handleHexInput('3')">3</button>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 w-1/3 p-2 border-2 border-gray-300 bg-gray-50">
+                    <button class="key-btn text-sm py-2" title="Reset: PC = 0000 (R)" onclick="handleCommand('Reset')">Reset</button>
+                    <button class="key-btn text-sm py-2" title="Keyboard interrupt: stop a running program (Esc)" onclick="handleCommand('Kbint')">Kbint</button>
+                    <button class="key-btn text-sm py-2" title="Previous (←)" onclick="handleCommand('Prev')">Prev</button>
+                    <button class="key-btn text-sm py-2" title="Examine / modify memory (M)" onclick="handleCommand('ExamMem')">Exam Mem</button>
+                    <button class="key-btn text-sm py-2" title="Next (→)" onclick="handleCommand('Next')">Next</button>
+                    <button class="key-btn text-sm py-2" title="Examine / modify registers (X)" onclick="handleCommand('ExamReg')">Exam Reg</button>
+                    <button class="key-btn text-sm py-2" title="Choose a start address (G)" onclick="handleCommand('Go')">Go</button>
+                    <button class="key-btn text-sm py-2" title="Run from the chosen address (Enter)" onclick="handleCommand('Exec')">Exec</button>
+                </div>
+            </div>
+
+            <!-- Registers & Flags -->
+            <div class="p-2 border-2 border-gray-300 bg-white">
+                <div class="adv-only flex justify-between items-center mb-2">
+                    <div class="text-xs font-bold text-gray-500">REGISTERS <span class="font-normal">(click a value to edit, hex)</span></div>
+                    <span id="run-chip" class="text-xs font-bold px-2 py-0.5 rounded bg-gray-300 text-gray-700">READY</span>
+                </div>
+                <div id="reg-grid" class="adv-only grid grid-cols-4 gap-x-3 gap-y-1 mb-3"></div>
+                <div class="basic-only text-xs font-bold text-gray-500 mb-1">REGISTERS:</div>
+                <div id="reg-text" class="basic-only font-mono text-sm mb-3" style="white-space:pre-line"></div>
+
+                <table class="w-full text-center border-collapse border border-gray-400 text-sm font-mono">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="border border-gray-400">S</th>
+                            <th class="border border-gray-400">Z</th>
+                            <th class="border border-gray-400"></th>
+                            <th class="border border-gray-400">AC</th>
+                            <th class="border border-gray-400"></th>
+                            <th class="border border-gray-400">P</th>
+                            <th class="border border-gray-400"></th>
+                            <th class="border border-gray-400">CY</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="flag-row">
+                            <td class="border border-gray-400 flag-cell" data-flag="S" title="Sign flag (click to toggle)">0</td>
+                            <td class="border border-gray-400 flag-cell" data-flag="Z" title="Zero flag">0</td>
+                            <td class="border border-gray-400 text-gray-400">X</td>
+                            <td class="border border-gray-400 flag-cell" data-flag="AC" title="Auxiliary carry">0</td>
+                            <td class="border border-gray-400 text-gray-400">X</td>
+                            <td class="border border-gray-400 flag-cell" data-flag="P" title="Parity (1 = even)">0</td>
+                            <td class="border border-gray-400 text-gray-400">X</td>
+                            <td class="border border-gray-400 flag-cell" data-flag="CY" title="Carry flag">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="adv-only mt-2 text-xs font-mono text-gray-600 flex flex-wrap gap-x-4">
+                    <span>Flag byte: <b id="flag-byte">02</b></span>
+                    <span>Instr: <b id="cnt-instr">0</b></span>
+                    <span>T-states: <b id="cnt-t">0</b></span>
+                    <span>@3 MHz: <b id="cnt-time">0 µs</b></span>
+                </div>
+            </div>
+
+            <!-- Interrupts -->
+            <div class="adv-only p-2 border-2 border-gray-300 bg-white">
+                <div class="text-xs font-bold text-gray-500 mb-2">INTERRUPTS <span class="font-normal">(LED lit = pending / set)</span></div>
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <button class="tb-btn" onclick="triggerInt('trap')">TRAP <span class="led amber" id="led-trap"></span></button>
+                    <button class="tb-btn" onclick="triggerInt('75')">RST 7.5 <span class="led amber" id="led-p75"></span></button>
+                    <button class="tb-btn" onclick="triggerInt('65')">RST 6.5 <span class="led amber" id="led-p65"></span></button>
+                    <button class="tb-btn" onclick="triggerInt('55')">RST 5.5 <span class="led amber" id="led-p55"></span></button>
+                    <span class="flex items-center gap-1">
+                        <button class="tb-btn" onclick="triggerInt('intr')">INTR <span class="led amber" id="led-intr"></span></button>
+                        <select id="intr-n" class="text-xs border border-gray-400 p-1" title="RST n opcode placed on the bus by the interrupting device">
+                            <option value="0">RST 0</option><option value="1">RST 1</option><option value="2">RST 2</option><option value="3">RST 3</option>
+                            <option value="4">RST 4</option><option value="5">RST 5</option><option value="6">RST 6</option><option value="7" selected>RST 7</option>
+                        </select>
+                    </span>
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono items-center">
+                    <span>IE <span class="led" id="led-ie"></span></span>
+                    <span>M7.5 <span class="led" id="led-m75"></span></span>
+                    <span>M6.5 <span class="led" id="led-m65"></span></span>
+                    <span>M5.5 <span class="led" id="led-m55"></span></span>
+                    <span>SOD <span class="led" id="led-sod"></span></span>
+                    <span>SID <span class="led sw" id="led-sid" title="Click to toggle the SID input pin"></span></span>
+                    <span class="text-gray-500">vectors: TRAP 0024 · 5.5 002C · 6.5 0034 · 7.5 003C</span>
+                </div>
+            </div>
+
+            <!-- I/O -->
+            <div class="adv-only p-2 border-2 border-gray-300 bg-white">
+                <div class="text-xs font-bold text-gray-500 mb-2">I/O PORTS <span class="font-normal">(IN reads the switches, OUT lights the LEDs)</span></div>
+                <div class="flex items-center gap-2 mb-2 text-xs font-mono">
+                    <span>Input port</span>
+                    <input id="io-port" maxlength="2" value="00" class="reg-in" style="width:36px">
+                    <span id="io-switches" class="flex gap-1 items-center"></span>
+                    <b id="io-in-hex">00</b>
+                </div>
+                <div id="io-out" class="text-xs font-mono flex flex-col gap-1 min-h-[1.25rem]"><span class="text-gray-400">No OUT instruction executed yet.</span></div>
+            </div>
+        </div>
+
+        <!-- ================= RIGHT PANEL: EDITOR, DEBUG & MEMORY ================= -->
+        <div class="flex-1 min-w-0 bg-white p-4 border border-gray-400 flex flex-col gap-3 relative">
+            <h2 class="text-sm font-bold text-gray-500 bg-gray-300 p-1 -mt-4 -mx-4 border-b border-gray-400">Debug Form</h2>
+
+            <div class="adv-only flex flex-col gap-3">
+            <!-- Toolbar -->
+            <div class="flex flex-wrap items-center gap-2 bg-gray-100 p-2 border border-gray-300">
+                <select id="sample-select" class="text-xs border border-gray-400 p-1 max-w-[200px]" title="Load an example program"></select>
+                <button class="tb-btn primary" onclick="assembleAndLoad()" title="Ctrl+Enter">Assemble &amp; Load</button>
+                <span class="border-l border-gray-400 h-5"></span>
+                <button class="tb-btn go" id="btn-run" onclick="startRun()" title="F5">▶ Run</button>
+                <button class="tb-btn stop" id="btn-pause" onclick="stopRun('Paused')" title="Esc">⏸ Pause</button>
+                <button class="tb-btn" onclick="handleCommand('Step')" title="F10">Step</button>
+                <button class="tb-btn" onclick="stepOver()" title="F11 — runs a CALL as one step">Step Over</button>
+                <button class="tb-btn" onclick="restartProgram()" title="Clear registers, PC = program start (memory kept)">↺ Restart</button>
+                <label class="text-xs flex items-center gap-1">Speed
+                    <select id="speed" class="text-xs border border-gray-400 p-1">
+                        <option value="0">2 instr/s</option>
+                        <option value="1">10 instr/s</option>
+                        <option value="2" selected>50 instr/s</option>
+                        <option value="3">~12k instr/s</option>
+                        <option value="4">Max</option>
+                    </select>
+                </label>
+                <span class="ml-auto"></span>
+                <button class="tb-btn" onclick="downloadAsm()" title="Download source as .asm">Save .asm</button>
+                <button class="tb-btn" onclick="document.getElementById('file-asm').click()">Open .asm</button>
+                <input type="file" id="file-asm" accept=".asm,.txt,.s,text/plain" class="hidden">
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 -mt-1">
+                <span id="storage-label">Storage: checking…</span>
+                <button onclick="saveState()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded shadow">Save State</button>
+                <button onclick="loadState()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded shadow">Load State</button>
+            </div>
+
+            <!-- Editor -->
+            <div class="editor-wrap">
+                <div class="gutter" id="gutter"></div>
+                <textarea id="editor" spellcheck="false" wrap="off" placeholder="Write 8085 assembly here, or pick an example above. Ctrl+Enter assembles."></textarea>
+            </div>
+            <div id="asm-msg" class="text-xs font-mono bg-gray-50 border border-gray-300 p-2 min-h-[2.25rem] max-h-24 overflow-auto"></div>
+
+            <!-- Tabs -->
+            <div>
+                <div class="flex" id="tabs">
+                    <button class="tab-btn active" data-tab="listing">Debug Listing</button>
+                    <button class="tab-btn" data-tab="memory">Memory</button>
+                    <button class="tab-btn" data-tab="trace">Execution Trace</button>
+                    <button class="tab-btn" data-tab="ref">Instruction Set</button>
+                </div>
+                <div class="border-2 border-gray-300 h-[380px] overflow-y-auto relative" id="tab-area">
+
+                    <!-- Listing -->
+                    <div id="tab-listing">
+                        <div class="sticky top-0 z-10 bg-gray-100 border-b border-gray-300 p-1 flex flex-wrap items-center gap-3 text-xs">
+                            <label>View from <input id="list-from" maxlength="4" class="reg-in" style="width:52px" value="8000"></label>
+                            <label class="flex items-center gap-1"><input type="checkbox" id="list-follow" checked> Follow PC</label>
+                            <span class="text-gray-500">Click the <span class="text-red-600">●</span> column to set a breakpoint · click an address to move PC there</span>
+                        </div>
+                        <table class="w-full text-left text-sm border-collapse">
+                            <thead class="bg-gray-200 sticky top-[30px]">
+                                <tr>
+                                    <th class="border border-gray-400 p-1 w-6"></th>
+                                    <th class="border border-gray-400 p-1 w-1/6">ADDRESS</th>
+                                    <th class="border border-gray-400 p-1 w-1/5">OPCODE</th>
+                                    <th class="border border-gray-400 p-1">INSTRUCTION</th>
+                                    <th class="border border-gray-400 p-1 w-14">BYTES</th>
+                                    <th class="border border-gray-400 p-1 w-16">T</th>
+                                </tr>
+                            </thead>
+                            <tbody id="listing-body" class="font-mono bg-white"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Memory -->
+                    <div id="tab-memory" class="hidden p-2">
+                        <div class="flex flex-wrap items-center gap-2 text-xs mb-2">
+                            <label>Address <input id="mem-from" maxlength="4" class="reg-in" style="width:52px" value="8000"></label>
+                            <button class="tb-btn" onclick="memPage(-1)">◀ Page</button>
+                            <button class="tb-btn" onclick="memPage(1)">Page ▶</button>
+                            <button class="tb-btn" onclick="memJump('pc')">PC</button>
+                            <button class="tb-btn" onclick="memJump('hl')">HL</button>
+                            <button class="tb-btn" onclick="memJump('sp')">SP</button>
+                            <button class="tb-btn" onclick="clearMemory()">Clear all memory</button>
+                            <span class="text-gray-600">Legend: <span class="mc pc">PC</span> <span class="mc hl">HL</span> <span class="mc sp">SP</span> <span class="mc wr">written</span> — click a byte to edit it</span>
+                        </div>
+                        <table class="font-mono text-xs border-collapse" id="mem-table"></table>
+                    </div>
+
+                    <!-- Trace -->
+                    <div id="tab-trace" class="hidden">
+                        <div class="sticky top-0 bg-gray-100 border-b border-gray-300 p-1 text-xs flex justify-between items-center">
+                            <span>Every executed instruction and exactly what it changed (newest first, last 300).</span>
+                            <button class="tb-btn" onclick="clearTrace()">Clear</button>
+                        </div>
+                        <table class="w-full text-left text-xs border-collapse font-mono">
+                            <thead class="bg-gray-200 sticky top-[30px]"><tr>
+                                <th class="border border-gray-400 p-1 w-12">#</th>
+                                <th class="border border-gray-400 p-1 w-14">PC</th>
+                                <th class="border border-gray-400 p-1 w-40">INSTRUCTION</th>
+                                <th class="border border-gray-400 p-1 w-10">T</th>
+                                <th class="border border-gray-400 p-1">CHANGES</th>
+                            </tr></thead>
+                            <tbody id="trace-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Reference -->
+                    <div id="tab-ref" class="hidden">
+                        <div class="sticky top-0 bg-gray-100 border-b border-gray-300 p-1 text-xs flex items-center gap-2">
+                            <input id="ref-search" placeholder="Search: ADD, carry, stack, jump…" class="border border-gray-400 px-2 py-1 flex-1">
+                        </div>
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-gray-200 sticky top-[34px]"><tr>
+                                <th class="border border-gray-400 p-1">INSTRUCTION</th>
+                                <th class="border border-gray-400 p-1">OPCODE</th>
+                                <th class="border border-gray-400 p-1">B</th>
+                                <th class="border border-gray-400 p-1">T</th>
+                                <th class="border border-gray-400 p-1">FLAGS</th>
+                                <th class="border border-gray-400 p-1">WHAT IT DOES</th>
+                            </tr></thead>
+                            <tbody id="ref-body"></tbody>
+                        </table>
+                        <div class="p-2 text-xs text-gray-700 border-t border-gray-300 leading-relaxed">
+                            <b>Assembler syntax.</b> <code>LABEL:</code> defines a label · comments start with <code>;</code> ·
+                            numbers: <code>2500H</code>, <code>0x25</code>, <code>$25</code>, <code>37</code>, <code>1010B</code>, <code>'A'</code> (a hex number starting with a letter needs a leading 0, e.g. <code>0FFH</code>) ·
+                            expressions like <code>TABLE+3</code>, <code>HIGH(X)</code>, <code>LOW(X)</code>, <code>$</code> (current address) ·
+                            directives: <code>ORG addr</code> (default 8000H), <code>DB 1,2,'Hi'</code>, <code>DW 1234H</code>, <code>DS n</code> (reserve bytes), <code>NAME EQU value</code>, <code>END</code>.
+                            Keyboard: digits/A–F type on the keypad · <kbd>→</kbd> Next · <kbd>←</kbd> Prev · <kbd>F5</kbd> Run · <kbd>F10</kbd> Step · <kbd>F11</kbd> Step over · <kbd>Esc</kbd> Pause · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> assemble.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </div>
+
+            <!-- BASIC MODE: debug form like the original trainer software -->
+            <div class="basic-only flex flex-col gap-3">
+                <div class="flex flex-wrap items-center gap-2 text-xs bg-gray-100 border border-gray-300 p-2">
+                    <span class="font-bold text-gray-600">ROW NUMBER</span>
+                    <input id="row-num" type="number" min="1" class="reg-in" style="width:64px" onkeydown="if(event.key==='Enter'){showRow();event.stopPropagation();}">
+                    <button class="tb-btn" onclick="showRow()">Show ROW</button>
+                    <span class="ml-auto"></span>
+                    <button class="tb-btn" title="Clear all memory and registers" onclick="newAll()">New (clear all)</button>
+                </div>
+                <div id="basic-scroll" class="border-2 border-gray-300 h-[330px] overflow-y-auto relative bg-white">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead class="bg-gray-200 sticky top-0">
+                            <tr>
+                                <th class="border border-gray-400 p-1 w-1/5">ADDRESS</th>
+                                <th class="border border-gray-400 p-1 w-1/5">OPCODE</th>
+                                <th class="border border-gray-400 p-1 w-2/5">INSTRUCTION</th>
+                                <th class="border border-gray-400 p-1 w-1/5">BYTES</th>
+                            </tr>
+                        </thead>
+                        <tbody id="basic-body" class="font-mono bg-white"></tbody>
+                    </table>
+                </div>
+                <div class="border-2 border-gray-300">
+                    <div class="bg-gray-200 text-center text-xs font-bold text-gray-600 border-b border-gray-300 py-0.5">STACK (LIFO)</div>
+                    <div class="h-[130px] overflow-y-auto">
+                        <table class="w-full text-center text-sm border-collapse">
+                            <thead class="bg-gray-100 sticky top-0"><tr><th class="border border-gray-300 text-red-800 text-xs">ADDRESS</th><th class="border border-gray-300 text-red-800 text-xs">DATA</th></tr></thead>
+                            <tbody id="stack-body" class="font-mono"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="mt-auto bg-gray-200 border border-gray-400 p-1 flex justify-between gap-4 text-xs font-mono">
+                <span id="status-left" class="shrink-0">Key pressed: --</span>
+                <span id="status-mid" class="flex-1 text-center truncate"></span>
+                <span id="status-right" class="shrink-0">Previous Function: &lt;RESET&gt;</span>
+            </div>
+        </div>
+        <!-- ================= SHORTCUTS COLUMN ================= -->
+        <div class="lg:w-[200px] shrink-0 bg-white p-4 border border-gray-400 flex flex-col gap-2 self-start">
+            <h2 class="text-sm font-bold text-gray-500 bg-gray-300 p-1 -mt-4 -mx-4 border-b border-gray-400">Shortcuts</h2>
+            <table class="w-full text-xs border-collapse">
+                <thead class="bg-gray-100"><tr><th class="border border-gray-300 p-1 text-left">KEY</th><th class="border border-gray-300 p-1 text-left">ACTION</th></tr></thead>
+                <tbody>
+                    <tr><td class="border border-gray-300 p-1"><kbd>0</kbd>–<kbd>9</kbd> <kbd>A</kbd>–<kbd>F</kbd></td><td class="border border-gray-300 p-1">Type a hex digit</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>→</kbd></td><td class="border border-gray-300 p-1">Next</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>←</kbd></td><td class="border border-gray-300 p-1">Prev</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>M</kbd></td><td class="border border-gray-300 p-1">Exam Mem</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>X</kbd></td><td class="border border-gray-300 p-1">Exam Reg</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>G</kbd></td><td class="border border-gray-300 p-1">Go</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>Enter</kbd></td><td class="border border-gray-300 p-1">Exec</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>R</kbd></td><td class="border border-gray-300 p-1">Reset</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>Esc</kbd></td><td class="border border-gray-300 p-1">Kbint (stop)</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>S</kbd> <kbd>F10</kbd></td><td class="border border-gray-300 p-1">Step one instruction</td></tr>
+                    <tr class="adv-only"><td class="border border-gray-300 p-1"><kbd>F5</kbd></td><td class="border border-gray-300 p-1">Run</td></tr>
+                    <tr class="adv-only"><td class="border border-gray-300 p-1"><kbd>F11</kbd></td><td class="border border-gray-300 p-1">Step over CALL</td></tr>
+                    <tr class="adv-only"><td class="border border-gray-300 p-1"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></td><td class="border border-gray-300 p-1">Assemble &amp; load</td></tr>
+                </tbody>
+            </table>
+            <div class="text-xs text-gray-500 leading-snug mt-1"><b>To enter a program:</b> Exam Mem → type address → Next → type a byte → Next … Then Reset, Go → address → Exec.</div>
+        </div>
+    </div>
+
+    <footer class="text-sm text-gray-100 py-1">Made by <b>Abhinav Dharmesh</b></footer>
+
+    <!-- Custom Modal for Alerts (Instead of standard browser alert()) -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-80">
+            <h3 class="text-lg font-bold mb-2">Notification</h3>
+            <p id="custom-modal-msg" class="text-sm text-gray-700 mb-4"></p>
+            <button onclick="closeModal()" class="w-full bg-blue-600 text-white font-bold py-2 rounded">OK</button>
+        </div>
+    </div>
+
+    <!-- Firebase Imports and Config (optional cloud save; falls back to this browser's storage) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : '8085-simulator-default';
+        let db, auth, userId;
+
+        if (typeof __firebase_config !== 'undefined') {
+            try {
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                (async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                        userId = auth.currentUser.uid;
+                        console.log("Firebase Auth Success, UID:", userId);
+                        if (window.refreshStorageLabel) window.refreshStorageLabel();
+                    } catch (error) {
+                        console.error("Firebase Auth Error:", error);
+                    }
+                })();
+            } catch (e) {
+                console.error("Firebase Init Error:", e);
+            }
+        } else {
+            console.warn("No Firebase config found. Using browser storage only.");
+        }
+
+        window.cloudApi = {
+            ready: () => !!(db && userId),
+            async save(json) {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'states', 'currentState');
+                await setDoc(docRef, { json, timestamp: new Date().toISOString() });
+            },
+            async load() {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'states', 'currentState');
+                const snap = await getDoc(docRef);
+                return snap.exists() ? snap.data().json : null;
+            }
+        };
+        if (window.refreshStorageLabel) window.refreshStorageLabel();
+    </script>
+
+    <!-- ===================== 8085 CORE (CPU + ASSEMBLER) ===================== -->
+    <script id="core">
+    // ==== CORE START ====
+    const REGS = ['B','C','D','E','H','L','M','A'];
+    const CCN  = ['NZ','Z','NC','C','PO','PE','P','M'];
+    const hex2 = v => (v & 255).toString(16).toUpperCase().padStart(2, '0');
+    const hex4 = v => (v & 65535).toString(16).toUpperCase().padStart(4, '0');
+    function fmtH(v, w) { const s = v.toString(16).toUpperCase().padStart(w, '0'); return (/^[A-F]/.test(s) ? '0' : '') + s + 'H'; }
+    const PAR = new Uint8Array(256);
+    for (let i = 0; i < 256; i++) { let c = 0, v = i; while (v) { c += v & 1; v >>= 1; } PAR[i] = (c % 2 === 0) ? 1 : 0; }
+
+    // ---------- Instruction table (used by the assembler, disassembler and reference) ----------
+    const ISA = new Array(256).fill(null);
+    function def(op, mn, ops, imm) {
+        ISA[op] = { op, mn, ops: ops || [], imm: imm || null, len: (imm === 'd16' || imm === 'a16') ? 3 : (imm ? 2 : 1) };
+    }
+    (function buildISA() {
+        const RP = ['B','D','H','SP'], PP = ['B','D','H','PSW'];
+        const ALU = ['ADD','ADC','SUB','SBB','ANA','XRA','ORA','CMP'];
+        const ALUI = ['ADI','ACI','SUI','SBI','ANI','XRI','ORI','CPI'];
+        def(0x00,'NOP'); def(0x20,'RIM'); def(0x30,'SIM');
+        for (let i = 0; i < 4; i++) {
+            def(0x01 + 16*i,'LXI',[RP[i]],'d16'); def(0x03 + 16*i,'INX',[RP[i]]);
+            def(0x0B + 16*i,'DCX',[RP[i]]);       def(0x09 + 16*i,'DAD',[RP[i]]);
+            def(0xC1 + 16*i,'POP',[PP[i]]);       def(0xC5 + 16*i,'PUSH',[PP[i]]);
+        }
+        def(0x02,'STAX',['B']); def(0x12,'STAX',['D']); def(0x0A,'LDAX',['B']); def(0x1A,'LDAX',['D']);
+        for (let r = 0; r < 8; r++) {
+            def(0x04 + 8*r,'INR',[REGS[r]]); def(0x05 + 8*r,'DCR',[REGS[r]]); def(0x06 + 8*r,'MVI',[REGS[r]],'d8');
+        }
+        def(0x07,'RLC'); def(0x0F,'RRC'); def(0x17,'RAL'); def(0x1F,'RAR');
+        def(0x27,'DAA'); def(0x2F,'CMA'); def(0x37,'STC'); def(0x3F,'CMC');
+        def(0x22,'SHLD',[],'a16'); def(0x2A,'LHLD',[],'a16'); def(0x32,'STA',[],'a16'); def(0x3A,'LDA',[],'a16');
+        for (let d = 0; d < 8; d++) for (let s = 0; s < 8; s++) {
+            const op = 0x40 + 8*d + s;
+            if (op === 0x76) def(0x76,'HLT'); else def(op,'MOV',[REGS[d],REGS[s]]);
+        }
+        for (let k = 0; k < 8; k++) {
+            for (let s = 0; s < 8; s++) def(0x80 + 8*k + s, ALU[k], [REGS[s]]);
+            def(0xC6 + 8*k, ALUI[k], [], 'd8');
+        }
+        for (let i = 0; i < 8; i++) {
+            def(0xC0 + 8*i,'R' + CCN[i]); def(0xC2 + 8*i,'J' + CCN[i],[],'a16');
+            def(0xC4 + 8*i,'C' + CCN[i],[],'a16'); def(0xC7 + 8*i,'RST',[String(i)]);
+        }
+        def(0xC3,'JMP',[],'a16'); def(0xCD,'CALL',[],'a16'); def(0xC9,'RET');
+        def(0xD3,'OUT',[],'d8'); def(0xDB,'IN',[],'d8');
+        def(0xE3,'XTHL'); def(0xE9,'PCHL'); def(0xEB,'XCHG'); def(0xF9,'SPHL'); def(0xF3,'DI'); def(0xFB,'EI');
+    })();
+    const MNMAP = {};
+    ISA.forEach(e => { if (e) (MNMAP[e.mn] = MNMAP[e.mn] || []).push(e); });
+
+    // ---------- Machine state ----------
+    const cpu = {
+        mem: new Uint8Array(65536), r: new Uint8Array(8), // r[0..7] = B C D E H L (unused) A
+        sp: 0x8421, pc: 0, S: 0, Z: 0, AC: 0, P: 0, CY: 0,
+        ie: 0, ieNext: 0, m55: 1, m65: 1, m75: 1, p55: 0, p65: 0, p75: 0, trap: 0, intr: -1, sid: 0, sod: 0,
+        halted: false, tstates: 0, icount: 0,
+        ioIn: new Uint8Array(256), ioOut: new Uint8Array(256), outUsed: new Set(),
+        writes: [], lastOut: null, stackW: new Set()
+    };
+    function getF() { return (cpu.S << 7) | (cpu.Z << 6) | (cpu.AC << 4) | (cpu.P << 2) | 2 | cpu.CY; }
+    function setF(v) { cpu.S = (v >> 7) & 1; cpu.Z = (v >> 6) & 1; cpu.AC = (v >> 4) & 1; cpu.P = (v >> 2) & 1; cpu.CY = v & 1; }
+    function HL() { return (cpu.r[4] << 8) | cpu.r[5]; }
+    function rd(a) { return cpu.mem[a & 0xFFFF]; }
+    function wr(a, v) { a &= 0xFFFF; cpu.mem[a] = v & 255; cpu.writes.push(a); }
+    function getR(i) { return i === 6 ? rd(HL()) : cpu.r[i]; }
+    function setR(i, v) { if (i === 6) wr(HL(), v); else cpu.r[i] = v & 255; }
+    function getRP(p) {
+        switch (p) { case 0: return (cpu.r[0] << 8) | cpu.r[1]; case 1: return (cpu.r[2] << 8) | cpu.r[3];
+                     case 2: return (cpu.r[4] << 8) | cpu.r[5]; default: return cpu.sp; }
+    }
+    function setRP(p, v) {
+        v &= 0xFFFF;
+        switch (p) { case 0: cpu.r[0] = v >> 8; cpu.r[1] = v & 255; break; case 1: cpu.r[2] = v >> 8; cpu.r[3] = v & 255; break;
+                     case 2: cpu.r[4] = v >> 8; cpu.r[5] = v & 255; break; default: cpu.sp = v; }
+    }
+    function push16(v) { cpu.sp = (cpu.sp - 1) & 0xFFFF; wr(cpu.sp, v >> 8); cpu.stackW.add(cpu.sp); cpu.sp = (cpu.sp - 1) & 0xFFFF; wr(cpu.sp, v & 255); cpu.stackW.add(cpu.sp); }
+    function pop16() { const lo = rd(cpu.sp); cpu.sp = (cpu.sp + 1) & 0xFFFF; const hi = rd(cpu.sp); cpu.sp = (cpu.sp + 1) & 0xFFFF; return (hi << 8) | lo; }
+    function szp(v) { cpu.S = (v >> 7) & 1; cpu.Z = v === 0 ? 1 : 0; cpu.P = PAR[v]; }
+    function cond(n) {
+        switch (n) { case 0: return !cpu.Z; case 1: return !!cpu.Z; case 2: return !cpu.CY; case 3: return !!cpu.CY;
+                     case 4: return !cpu.P; case 5: return !!cpu.P; case 6: return !cpu.S; default: return !!cpu.S; }
+    }
+    function alu(k, v) {
+        const A = cpu.r[7]; let res;
+        switch (k) {
+            case 0: case 1: { const c = (k === 1) ? cpu.CY : 0; res = A + v + c; cpu.AC = ((A & 15) + (v & 15) + c) > 15 ? 1 : 0; cpu.CY = res > 255 ? 1 : 0; res &= 255; cpu.r[7] = res; break; }
+            case 2: case 3: case 7: { const c = (k === 3) ? cpu.CY : 0; res = A - v - c; cpu.AC = ((A & 15) - (v & 15) - c) >= 0 ? 1 : 0; cpu.CY = res < 0 ? 1 : 0; res &= 255; if (k !== 7) cpu.r[7] = res; break; }
+            case 4: res = A & v; cpu.CY = 0; cpu.AC = 1; cpu.r[7] = res; break;
+            case 5: res = A ^ v; cpu.CY = 0; cpu.AC = 0; cpu.r[7] = res; break;
+            default: res = A | v; cpu.CY = 0; cpu.AC = 0; cpu.r[7] = res; break;
+        }
+        szp(res);
+    }
+    // T-states for an opcode (tk = conditional branch taken)
+    function tOp(op, tk) {
+        if (op >= 0x40 && op < 0x80) { if (op === 0x76) return 5; return (((op >> 3) & 7) === 6 || (op & 7) === 6) ? 7 : 4; }
+        if (op >= 0x80 && op < 0xC0) return (op & 7) === 6 ? 7 : 4;
+        if (op < 0x40) {
+            switch (op & 7) {
+                case 4: case 5: return ((op >> 3) & 7) === 6 ? 10 : 4;
+                case 6: return ((op >> 3) & 7) === 6 ? 10 : 7;
+                case 1: return 10;
+                case 2: return (op === 0x22 || op === 0x2A) ? 16 : (op === 0x32 || op === 0x3A) ? 13 : 7;
+                case 3: return 6;
+                default: return 4;
+            }
+        }
+        switch (op) {
+            case 0xC9: return 10; case 0xCD: return 18; case 0xC3: return 10; case 0xD3: case 0xDB: return 10;
+            case 0xE3: return 16; case 0xE9: case 0xF9: return 6; case 0xEB: case 0xF3: case 0xFB: return 4;
+        }
+        switch (op & 7) {
+            case 0: return tk ? 12 : 6; case 1: return 10; case 2: return tk ? 10 : 7; case 4: return tk ? 18 : 9;
+            case 5: return 12; case 6: return 7; case 7: return 12; default: return 4;
+        }
+    }
+    function isCond(op) { return op >= 0xC0 && ((op & 7) === 0 || (op & 7) === 2 || (op & 7) === 4) && op !== 0xC3 && op !== 0xC9 && op !== 0xCD && ISA[op]; }
+    function tLabel(op) { return isCond(op) ? tOp(op, true) + '/' + tOp(op, false) : String(tOp(op, true)); }
+
+    function service(name, vec) {
+        push16(cpu.pc); cpu.pc = vec; cpu.ie = 0; cpu.ieNext = 0; cpu.halted = false; cpu.tstates += 12; cpu.icount++;
+        return name;
+    }
+    function pendingAccepted() {
+        return !!cpu.trap || (!!cpu.ie && ((cpu.p75 && !cpu.m75) || (cpu.p65 && !cpu.m65) || (cpu.p55 && !cpu.m55) || cpu.intr >= 0));
+    }
+    function checkInterrupt() {
+        if (cpu.trap) { cpu.trap = 0; return service('TRAP', 0x24); }
+        if (cpu.ie) {
+            if (cpu.p75 && !cpu.m75) { cpu.p75 = 0; return service('RST 7.5', 0x3C); }
+            if (cpu.p65 && !cpu.m65) { cpu.p65 = 0; return service('RST 6.5', 0x34); }
+            if (cpu.p55 && !cpu.m55) { cpu.p55 = 0; return service('RST 5.5', 0x2C); }
+            if (cpu.intr >= 0) { const n = cpu.intr; cpu.intr = -1; return service('INTR (RST ' + n + ')', n * 8); }
+        }
+        return null;
+    }
+
+    // Execute one instruction (or accept one interrupt). Returns info about what happened.
+    function step() {
+        cpu.writes.length = 0; cpu.lastOut = null;
+        const pc0 = cpu.pc;
+        const irq = checkInterrupt();
+        if (irq) return { pc: pc0, int: irq, cyc: 12 };
+        if (cpu.halted) return { pc: pc0, idle: true, cyc: 0 };
+        const fetch = () => { const v = cpu.mem[cpu.pc]; cpu.pc = (cpu.pc + 1) & 0xFFFF; return v; };
+        const fetch16 = () => { const lo = fetch(); return (fetch() << 8) | lo; };
+        const op = fetch(); let tk = true;
+        if (op >= 0x40 && op < 0x80) {
+            if (op === 0x76) cpu.halted = true; else setR((op >> 3) & 7, getR(op & 7));
+        } else if (op >= 0x80 && op < 0xC0) {
+            alu((op >> 3) & 7, getR(op & 7));
+        } else {
+            switch (op) {
+                // --- 8-bit INR / DCR / MVI ---
+                case 0x04: case 0x0C: case 0x14: case 0x1C: case 0x24: case 0x2C: case 0x34: case 0x3C: {
+                    const d = (op >> 3) & 7, v = (getR(d) + 1) & 255; setR(d, v); cpu.AC = (v & 15) === 0 ? 1 : 0; szp(v); break; }
+                case 0x05: case 0x0D: case 0x15: case 0x1D: case 0x25: case 0x2D: case 0x35: case 0x3D: {
+                    const d = (op >> 3) & 7, v = (getR(d) - 1) & 255; setR(d, v); cpu.AC = (v & 15) !== 15 ? 1 : 0; szp(v); break; }
+                case 0x06: case 0x0E: case 0x16: case 0x1E: case 0x26: case 0x2E: case 0x36: case 0x3E:
+                    setR((op >> 3) & 7, fetch()); break;
+                // --- 16-bit loads / arithmetic ---
+                case 0x01: case 0x11: case 0x21: case 0x31: setRP((op >> 4) & 3, fetch16()); break;
+                case 0x03: case 0x13: case 0x23: case 0x33: { const p = (op >> 4) & 3; setRP(p, getRP(p) + 1); break; }
+                case 0x0B: case 0x1B: case 0x2B: case 0x3B: { const p = (op >> 4) & 3; setRP(p, getRP(p) - 1); break; }
+                case 0x09: case 0x19: case 0x29: case 0x39: { const res = HL() + getRP((op >> 4) & 3); cpu.CY = res > 0xFFFF ? 1 : 0; setRP(2, res); break; }
+                // --- memory <-> accumulator / HL ---
+                case 0x02: wr(getRP(0), cpu.r[7]); break;
+                case 0x12: wr(getRP(1), cpu.r[7]); break;
+                case 0x0A: cpu.r[7] = rd(getRP(0)); break;
+                case 0x1A: cpu.r[7] = rd(getRP(1)); break;
+                case 0x22: { const a = fetch16(); wr(a, cpu.r[5]); wr(a + 1, cpu.r[4]); break; }
+                case 0x2A: { const a = fetch16(); cpu.r[5] = rd(a); cpu.r[4] = rd(a + 1); break; }
+                case 0x32: wr(fetch16(), cpu.r[7]); break;
+                case 0x3A: cpu.r[7] = rd(fetch16()); break;
+                // --- rotates & misc accumulator ---
+                case 0x07: cpu.CY = cpu.r[7] >> 7; cpu.r[7] = ((cpu.r[7] << 1) | cpu.CY) & 255; break;
+                case 0x0F: cpu.CY = cpu.r[7] & 1; cpu.r[7] = (cpu.r[7] >> 1) | (cpu.CY << 7); break;
+                case 0x17: { const c = cpu.CY; cpu.CY = cpu.r[7] >> 7; cpu.r[7] = ((cpu.r[7] << 1) | c) & 255; break; }
+                case 0x1F: { const c = cpu.CY; cpu.CY = cpu.r[7] & 1; cpu.r[7] = (cpu.r[7] >> 1) | (c << 7); break; }
+                case 0x27: { // DAA
+                    let a = cpu.r[7], ac = 0, cy = cpu.CY;
+                    if ((a & 15) > 9 || cpu.AC) { ac = ((a & 15) + 6) > 15 ? 1 : 0; a += 6; }
+                    if ((a >> 4) > 9 || cy) { a += 0x60; cy = 1; }
+                    cpu.AC = ac; cpu.CY = cy; cpu.r[7] = a & 255; szp(cpu.r[7]); break; }
+                case 0x2F: cpu.r[7] ^= 0xFF; break;
+                case 0x37: cpu.CY = 1; break;
+                case 0x3F: cpu.CY ^= 1; break;
+                // --- interrupt mask / serial I/O ---
+                case 0x20: // RIM
+                    cpu.r[7] = (cpu.sid << 7) | (cpu.p75 << 6) | (cpu.p65 << 5) | (cpu.p55 << 4) | (cpu.ie << 3) | (cpu.m75 << 2) | (cpu.m65 << 1) | cpu.m55; break;
+                case 0x30: { // SIM
+                    const a = cpu.r[7];
+                    if (a & 8) { cpu.m55 = a & 1; cpu.m65 = (a >> 1) & 1; cpu.m75 = (a >> 2) & 1; }
+                    if (a & 16) cpu.p75 = 0;
+                    if (a & 64) cpu.sod = (a >> 7) & 1;
+                    break; }
+                // --- immediate ALU ---
+                case 0xC6: case 0xCE: case 0xD6: case 0xDE: case 0xE6: case 0xEE: case 0xF6: case 0xFE:
+                    alu((op >> 3) & 7, fetch()); break;
+                // --- jumps / calls / returns ---
+                case 0xC3: cpu.pc = fetch16(); break;
+                case 0xC2: case 0xCA: case 0xD2: case 0xDA: case 0xE2: case 0xEA: case 0xF2: case 0xFA: {
+                    const a = fetch16(); tk = cond((op >> 3) & 7); if (tk) cpu.pc = a; break; }
+                case 0xCD: { const a = fetch16(); push16(cpu.pc); cpu.pc = a; break; }
+                case 0xC4: case 0xCC: case 0xD4: case 0xDC: case 0xE4: case 0xEC: case 0xF4: case 0xFC: {
+                    const a = fetch16(); tk = cond((op >> 3) & 7); if (tk) { push16(cpu.pc); cpu.pc = a; } break; }
+                case 0xC9: cpu.pc = pop16(); break;
+                case 0xC0: case 0xC8: case 0xD0: case 0xD8: case 0xE0: case 0xE8: case 0xF0: case 0xF8:
+                    tk = cond((op >> 3) & 7); if (tk) cpu.pc = pop16(); break;
+                case 0xC7: case 0xCF: case 0xD7: case 0xDF: case 0xE7: case 0xEF: case 0xF7: case 0xFF:
+                    push16(cpu.pc); cpu.pc = op & 0x38; break;
+                case 0xE9: cpu.pc = HL(); break;
+                // --- stack ---
+                case 0xC5: case 0xD5: case 0xE5: push16(getRP((op >> 4) & 3)); break;
+                case 0xF5: push16((cpu.r[7] << 8) | getF()); break;
+                case 0xC1: case 0xD1: case 0xE1: setRP((op >> 4) & 3, pop16()); break;
+                case 0xF1: { const v = pop16(); cpu.r[7] = v >> 8; setF(v & 255); break; }
+                case 0xE3: { const lo = rd(cpu.sp), hi = rd(cpu.sp + 1); wr(cpu.sp, cpu.r[5]); wr(cpu.sp + 1, cpu.r[4]); cpu.r[5] = lo; cpu.r[4] = hi; break; }
+                case 0xF9: cpu.sp = HL(); break;
+                case 0xEB: { const d = getRP(1), h = HL(); setRP(1, h); setRP(2, d); break; }
+                // --- I/O and interrupt enable ---
+                case 0xD3: { const p = fetch(); cpu.ioOut[p] = cpu.r[7]; cpu.outUsed.add(p); cpu.lastOut = { port: p, val: cpu.r[7] }; break; }
+                case 0xDB: cpu.r[7] = cpu.ioIn[fetch()]; break;
+                case 0xF3: cpu.ie = 0; cpu.ieNext = 0; break;
+                case 0xFB: cpu.ieNext = 1; break;
+                default: break; // NOP and undefined opcodes
+            }
+        }
+        const cyc = tOp(op, tk);
+        cpu.tstates += cyc; cpu.icount++;
+        if (cpu.ieNext && op !== 0xFB) { cpu.ie = 1; cpu.ieNext = 0; }
+        return { pc: pc0, op, cyc, tk };
+    }
+
+    function hardReset() {
+        cpu.pc = 0; cpu.ie = 0; cpu.ieNext = 0; cpu.m55 = cpu.m65 = cpu.m75 = 1; cpu.p55 = cpu.p65 = cpu.p75 = 0;
+        cpu.trap = 0; cpu.intr = -1; cpu.halted = false; cpu.sod = 0;
+    }
+    function restartCpu(startPc) {
+        cpu.r.fill(0); cpu.sp = 0x8421; cpu.stackW.clear(); setF(0); hardReset(); cpu.pc = startPc & 0xFFFF;
+        cpu.tstates = 0; cpu.icount = 0; cpu.ioOut.fill(0); cpu.outUsed.clear(); cpu.writes.length = 0;
+    }
+
+    // ---------- Disassembler ----------
+    function disasm(a) {
+        a &= 0xFFFF;
+        const op = cpu.mem[a], e = ISA[op];
+        if (!e) return { addr: a, len: 1, bytes: [op], text: 'DB ' + fmtH(op, 2) + '  ; undefined', op, e: null };
+        const bytes = [op], ops = e.ops.slice();
+        if (e.imm === 'd8') { const v = cpu.mem[(a + 1) & 0xFFFF]; bytes.push(v); ops.push(fmtH(v, 2)); }
+        else if (e.imm) { const lo = cpu.mem[(a + 1) & 0xFFFF], hi = cpu.mem[(a + 2) & 0xFFFF]; bytes.push(lo, hi); ops.push(fmtH((hi << 8) | lo, 4)); }
+        return { addr: a, len: e.len, bytes, text: e.mn + (ops.length ? ' ' + ops.join(',') : ''), op, e };
+    }
+
+    // ---------- Assembler ----------
+    const DIRS = { ORG: 1, DB: 1, DW: 1, DS: 1, EQU: 1, END: 1 };
+    function stripComment(s) {
+        let q = null;
+        for (let i = 0; i < s.length; i++) {
+            const c = s[i];
+            if (q) { if (c === q) q = null; }
+            else if (c === "'" || c === '"') q = c;
+            else if (c === ';') return s.slice(0, i);
+        }
+        return s;
+    }
+    function splitOps(s) {
+        const out = []; let cur = '', q = null, depth = 0;
+        for (const c of s) {
+            if (q) { cur += c; if (c === q) q = null; continue; }
+            if (c === "'" || c === '"') { q = c; cur += c; continue; }
+            if (c === '(') depth++; if (c === ')') depth--;
+            if (c === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+            cur += c;
+        }
+        if (cur.trim() !== '' || out.length) out.push(cur.trim());
+        return out;
+    }
+    function numTok(t) {
+        if (/^0X[0-9A-F]+$/i.test(t)) return parseInt(t.slice(2), 16);
+        if (/^\$[0-9A-F]+$/i.test(t)) return parseInt(t.slice(1), 16);
+        if (/^[0-9][0-9A-F]*H$/i.test(t)) return parseInt(t.slice(0, -1), 16);
+        if (/^[01]+B$/i.test(t)) return parseInt(t.slice(0, -1), 2);
+        if (/^[0-7]+[OQ]$/i.test(t)) return parseInt(t.slice(0, -1), 8);
+        if (/^[0-9]+D?$/i.test(t)) return parseInt(t, 10);
+        return null;
+    }
+    function evalExpr(str, symbols, here) {
+        const toks = []; const re = /\s*('(?:[^'\\]|\\.)'|"[^"]"|[A-Za-z0-9_?@$.]+|[()+\-*\/%])/y;
+        let m; re.lastIndex = 0;
+        while (re.lastIndex < str.length && (m = re.exec(str))) toks.push(m[1]);
+        if (str.slice(re.lastIndex).trim() !== '') throw new Error('Cannot parse expression "' + str + '"');
+        if (!toks.length) throw new Error('Missing value');
+        let i = 0;
+        const peek = () => toks[i], next = () => toks[i++];
+        function primary() {
+            const t = next();
+            if (t === undefined) throw new Error('Unexpected end of expression "' + str + '"');
+            if (t === '(') { const v = expr(); if (next() !== ')') throw new Error('Missing ) in "' + str + '"'); return v; }
+            if (t[0] === "'" || t[0] === '"') { const body = t.slice(1, -1); return body.startsWith('\\') ? ({ n: 10, r: 13, t: 9, '0': 0 }[body[1]] ?? body.charCodeAt(1)) : body.charCodeAt(0); }
+            const U = t.toUpperCase();
+            if ((U === 'HIGH' || U === 'LOW') && peek() === '(') { next(); const v = expr(); if (next() !== ')') throw new Error('Missing )'); return U === 'HIGH' ? (v >> 8) & 255 : v & 255; }
+            if (U === '$') return here;
+            const n = numTok(t); if (n !== null) return n;
+            if (Object.prototype.hasOwnProperty.call(symbols, U)) return symbols[U];
+            if (/^[A-F][0-9A-F]*H$/i.test(t)) return parseInt(t.slice(0, -1), 16);
+            throw new Error('Undefined symbol "' + t + '"');
+        }
+        function unary() { if (peek() === '-') { next(); return -unary(); } if (peek() === '+') { next(); return unary(); } return primary(); }
+        function term() { let v = unary(); while (peek() === '*' || peek() === '/' || peek() === '%') { const o = next(), r = unary(); v = o === '*' ? v * r : o === '/' ? Math.trunc(v / r) : v % r; } return v; }
+        function expr() { let v = term(); while (peek() === '+' || peek() === '-') { const o = next(), r = term(); v = o === '+' ? v + r : v - r; } return v; }
+        const v = expr();
+        if (i < toks.length) throw new Error('Unexpected "' + toks[i] + '" in "' + str + '"');
+        return v;
+    }
+    function matchEntry(mn, ops) {
+        const list = MNMAP[mn]; if (!list) return null;
+        if (mn === 'RST') return list;
+        for (const e of list) {
+            const need = e.ops.length + (e.imm ? 1 : 0);
+            if (ops.length !== need) continue;
+            let ok = true;
+            for (let i = 0; i < e.ops.length; i++) if (ops[i].toUpperCase().replace(/\s+/g, '') !== e.ops[i]) { ok = false; break; }
+            if (ok) return e;
+        }
+        return null;
+    }
+    function assemble(src) {
+        const lines = src.split(/\r?\n/), errors = [], symbols = {}, items = [];
+        let pc = 0x8000, startAddr = null, ended = false;
+        const err = (ln, msg) => errors.push({ line: ln, msg });
+        // ---- pass 1: sizes and labels ----
+        for (let ln = 0; ln < lines.length && !ended; ln++) {
+            let s = stripComment(lines[ln]).trim(); if (!s) continue;
+            let label = null, m = s.match(/^([A-Za-z_?@][\w?@.]*)\s*:\s*(.*)$/);
+            if (m) { label = m[1]; s = m[2].trim(); }
+            let mm = s ? s.match(/^(\S+)\s*(.*)$/) : null;
+            if (!label && mm && !MNMAP[mm[1].toUpperCase()] && !DIRS[mm[1].toUpperCase()]) {
+                const m2 = mm[2].match(/^(\S+)\s*(.*)$/);
+                if (m2 && (MNMAP[m2[1].toUpperCase()] || DIRS[m2[1].toUpperCase()])) { label = mm[1]; mm = m2; }
+            }
+            if (!mm) { if (label) { defineLabel(ln, label, pc); } continue; }
+            const mn = mm[1].toUpperCase(), rest = mm[2].trim(), ops = rest ? splitOps(rest) : [];
+            if (mn === 'EQU') {
+                if (!label) { err(ln, 'EQU needs a name:  NAME EQU value'); continue; }
+                try { defineLabel(ln, label, evalExpr(rest, symbols, pc)); } catch (e) { err(ln, e.message); }
+                continue;
+            }
+            if (label) defineLabel(ln, label, pc);
+            try {
+                if (mn === 'ORG') { pc = evalExpr(rest, symbols, pc) & 0xFFFF; if (startAddr === null) startAddr = pc; }
+                else if (mn === 'END') { ended = true; }
+                else if (mn === 'DB') {
+                    if (!ops.length) throw new Error('DB needs at least one value');
+                    let n = 0; for (const o of ops) n += (/^"[^"]{2,}"$|^'[^']{2,}'$/.test(o)) ? o.length - 2 : 1;
+                    items.push({ ln, addr: pc, kind: 'DB', ops, size: n }); if (startAddr === null) startAddr = pc; pc += n;
+                } else if (mn === 'DW') {
+                    if (!ops.length) throw new Error('DW needs at least one value');
+                    items.push({ ln, addr: pc, kind: 'DW', ops, size: ops.length * 2 }); if (startAddr === null) startAddr = pc; pc += ops.length * 2;
+                } else if (mn === 'DS') {
+                    const n = evalExpr(rest, symbols, pc); if (n < 0 || n > 0xFFFF) throw new Error('DS size out of range');
+                    items.push({ ln, addr: pc, kind: 'DS', size: n }); pc += n;
+                } else {
+                    if (!MNMAP[mn]) throw new Error('Unknown instruction "' + mm[1] + '"');
+                    let e;
+                    if (mn === 'RST') { if (ops.length !== 1) throw new Error('RST needs one operand (0-7)'); e = MNMAP.RST; }
+                    else { e = matchEntry(mn, ops); if (!e) throw new Error('Invalid operands for ' + mn + (ops.length ? ': ' + ops.join(',') : ' (operand missing)')); }
+                    const size = mn === 'RST' ? 1 : e.len;
+                    items.push({ ln, addr: pc, kind: 'I', mn, ops, entry: e, size }); if (startAddr === null) startAddr = pc; pc += size;
+                }
+                if (pc > 0x10000) throw new Error('Program runs past FFFFH');
+            } catch (e) { err(ln, e.message); }
+        }
+        function defineLabel(ln, name, val) {
+            const U = name.toUpperCase();
+            if (Object.prototype.hasOwnProperty.call(symbols, U)) err(ln, 'Label "' + name + '" defined twice');
+            else if (MNMAP[U] || DIRS[U] || REGS.includes(U) || U === 'SP' || U === 'PSW') err(ln, '"' + name + '" is a reserved word and cannot be a label');
+            else symbols[U] = val;
+        }
+        // ---- pass 2: emit ----
+        const bytes = new Map(), lineOfAddr = {}, addrOfLine = {};
+        const put = (a, v) => bytes.set(a & 0xFFFF, v & 255);
+        const b8 = (ln, str, here) => { const v = evalExpr(str, symbols, here); if (v < -128 || v > 255) throw new Error('Value ' + v + ' does not fit in 8 bits'); return v & 255; };
+        const b16 = (ln, str, here) => { const v = evalExpr(str, symbols, here); if (v < -32768 || v > 65535) throw new Error('Value ' + v + ' does not fit in 16 bits'); return v & 0xFFFF; };
+        for (const it of items) {
+            try {
+                if (it.kind === 'DS') continue;
+                lineOfAddr[it.addr] = it.ln; if (addrOfLine[it.ln] === undefined) addrOfLine[it.ln] = it.addr;
+                if (it.kind === 'DB') {
+                    let a = it.addr;
+                    for (const o of it.ops) {
+                        if (/^"[^"]{2,}"$|^'[^']{2,}'$/.test(o)) { for (const ch of o.slice(1, -1)) put(a++, ch.charCodeAt(0)); }
+                        else put(a++, b8(it.ln, o, a));
+                    }
+                } else if (it.kind === 'DW') {
+                    let a = it.addr; for (const o of it.ops) { const v = b16(it.ln, o, a); put(a++, v & 255); put(a++, v >> 8); }
+                } else {
+                    let e = it.entry;
+                    if (it.mn === 'RST') { const n = evalExpr(it.ops[0], symbols, it.addr); if (n < 0 || n > 7) throw new Error('RST number must be 0-7'); e = ISA[0xC7 + 8 * n]; }
+                    put(it.addr, e.op);
+                    if (e.imm === 'd8') put(it.addr + 1, b8(it.ln, it.ops[it.ops.length - 1], it.addr));
+                    else if (e.imm) { const v = b16(it.ln, it.ops[it.ops.length - 1], it.addr); put(it.addr + 1, v & 255); put(it.addr + 2, v >> 8); }
+                }
+            } catch (e) { err(it.ln, e.message); }
+        }
+        errors.sort((a, b) => a.line - b.line);
+        let lo = 0xFFFF, hi = 0; bytes.forEach((_, a) => { if (a < lo) lo = a; if (a > hi) hi = a; });
+        return { ok: errors.length === 0, errors, bytes, symbols, lineOfAddr, addrOfLine, start: startAddr === null ? 0x8000 : startAddr, lo, hi, count: bytes.size };
+    }
+
+    // ---------- Example programs ----------
+    const SAMPLES = [
+        { name: '1. Add two numbers (16-bit result)', code:
+`; Add two 8-bit numbers from memory; keep the carry as a 2nd byte.
+; Result is stored at RESULT (low) and RESULT+1 (high).
+        ORG 8000H
+        LDA NUM1        ; A <- first number
+        MOV B,A         ; park it in B
+        LDA NUM2        ; A <- second number
+        ADD B           ; A <- A + B, CY set if the sum > 255
+        MVI C,00H       ; C will hold the carry (high byte)
+        JNC STORE       ; no carry? skip the increment
+        INR C           ; carry -> high byte = 1
+STORE:  STA RESULT      ; low byte
+        MOV A,C
+        STA RESULT+1    ; high byte
+        HLT
+NUM1:   DB 0F5H
+NUM2:   DB 3CH
+RESULT: DS 2            ; expect 131H -> bytes 31H, 01H
+` },
+        { name: '2. Multiply by repeated addition', code:
+`; 12 x 5 using DAD (16-bit add) in a loop. Result -> 8050H/8051H
+        ORG 8000H
+        LXI H,0000H     ; running total
+        LXI D,000CH     ; multiplicand = 12
+        MVI B,05H       ; multiplier   = 5
+LOOP:   DAD D           ; HL <- HL + DE
+        DCR B
+        JNZ LOOP
+        SHLD 8050H      ; expect 3CH, 00H
+        HLT
+` },
+        { name: '3. Largest number in an array', code:
+`; Find the largest of 6 bytes starting at ARRAY. Result -> 8050H
+        ORG 8000H
+        LXI H,ARRAY
+        MVI C,06H       ; element count
+        MOV A,M         ; assume the first one is the largest
+        DCR C
+NEXT:   INX H
+        CMP M           ; A - M : CY=1 if A < M
+        JNC SKIP        ; A >= M, keep A
+        MOV A,M         ; otherwise M is the new maximum
+SKIP:   DCR C
+        JNZ NEXT
+        STA 8050H       ; expect 0A4H
+        HLT
+ARRAY:  DB 12H,0A4H,37H,9CH,5BH,80H
+` },
+        { name: '4. Block transfer (copy memory)', code:
+`; Copy 5 bytes from SRC to 9000H
+        ORG 8000H
+        LXI H,SRC       ; HL = source pointer
+        LXI D,9000H     ; DE = destination pointer
+        MVI C,05H
+LOOP:   MOV A,M
+        STAX D
+        INX H
+        INX D
+        DCR C
+        JNZ LOOP
+        HLT
+SRC:    DB 11H,22H,33H,44H,55H
+` },
+        { name: '5. BCD addition with DAA', code:
+`; 76 + 59 in BCD = 135.  Tens/units -> 8050H, hundreds -> 8051H
+        ORG 8000H
+        MVI A,76H
+        MVI B,59H
+        ADD B           ; binary add gives 0CFH
+        DAA             ; decimal adjust -> 35H with CY=1
+        STA 8050H
+        MVI A,00H       ; MVI does not touch CY
+        ACI 00H         ; add the carry into the hundreds digit
+        STA 8051H       ; expect 35H, 01H
+        HLT
+` },
+        { name: '6. Fibonacci series (10 terms)', code:
+`; Store the first 10 Fibonacci numbers from 8050H
+        ORG 8000H
+        LXI H,8050H
+        MVI C,0AH       ; how many terms
+        MVI D,00H       ; a
+        MVI E,01H       ; b
+LOOP:   MOV A,D
+        MOV M,A         ; store a
+        INX H
+        ADD E           ; A <- a + b
+        MOV D,E         ; a <- b
+        MOV E,A         ; b <- a + b
+        DCR C
+        JNZ LOOP
+        HLT             ; 00 01 01 02 03 05 08 0D 15 22
+` },
+        { name: '7. Bubble sort (ascending)', code:
+`; Sort 6 bytes at ARRAY in place
+        ORG 8000H
+        MVI D,05H       ; passes
+OUTER:  LXI H,ARRAY
+        MVI C,05H       ; comparisons per pass
+INNER:  MOV A,M
+        INX H
+        CMP M           ; compare this element with the next
+        JC NOSWAP       ; this < next -> fine
+        JZ NOSWAP       ; equal -> fine
+        MOV B,M         ; swap the pair
+        MOV M,A
+        DCX H
+        MOV M,B
+        INX H
+NOSWAP: DCR C
+        JNZ INNER
+        DCR D
+        JNZ OUTER
+        HLT
+ARRAY:  DB 45H,12H,0A0H,33H,07H,5EH
+` },
+        { name: '8. LED chaser: OUT, CALL, RET (use Max speed)', code:
+`; Rotates a single lit bit on output port 00 (see I/O PORTS panel).
+; Choose Speed = "~12k instr/s" or "Max", then Run. Press Pause to stop.
+        ORG 8000H
+        LXI SP,0FFFFH   ; stack is needed for CALL/RET
+        MVI A,01H
+LOOP:   OUT 00H
+        CALL DELAY
+        RLC             ; move the lit bit left
+        JMP LOOP
+
+DELAY:  MVI B,20H
+DL1:    MVI C,0FFH
+DL2:    DCR C
+        JNZ DL2
+        DCR B
+        JNZ DL1
+        RET
+` },
+        { name: '9. Input -> output (read switches, echo to LEDs)', code:
+`; Reads input port 01 (toggle the switches in the I/O panel)
+; and shows it on output port 00 forever. Use Run at ~12k or Max.
+        ORG 8000H
+LOOP:   IN 01H          ; switches on port 01 (set the "Input port" box to 01)
+        OUT 00H         ; LEDs on port 00
+        JMP LOOP
+` },
+        { name: '10. Interrupts: RST 5.5 counter', code:
+`; Main program enables RST 5.5, then sleeps with HLT.
+; Click "RST 5.5" in the Interrupts panel: the ISR at 002CH counts
+; in B and shows it on port 00, then returns to the HLT.
+        ORG 8000H
+        MVI B,00H
+        LXI SP,0FFFFH
+        MVI A,0EH       ; SIM: MSE=1, mask 7.5 & 6.5, unmask 5.5
+        SIM
+        EI
+WAIT:   HLT             ; sleep until an interrupt
+        JMP WAIT
+
+        ORG 002CH       ; RST 5.5 vector
+        INR B
+        MOV A,B
+        OUT 00H
+        EI              ; interrupts are disabled while servicing
+        RET
+` }
+    ];
+    // ==== CORE END ====
+    </script>
+
+    <!-- ===================== INSTRUCTION REFERENCE DATA ===================== -->
+    <script id="refdata">
+    // [syntax, opcode, bytes, T-states, flags, description]
+    const REF = [
+        ['MOV r1,r2','40–7F','1','4 (7 with M)','None','Copy r2 into r1. M means the memory byte addressed by HL.'],
+        ['MVI r,d8','06+8r','2','7 (10 M)','None','Load an 8-bit constant into r (or into memory at HL).'],
+        ['LXI rp,d16','01 11 21 31','3','10','None','Load a 16-bit constant into BC, DE, HL or SP.'],
+        ['LDA a16','3A','3','13','None','A ← memory[a16].'],
+        ['STA a16','32','3','13','None','memory[a16] ← A.'],
+        ['LHLD a16','2A','3','16','None','L ← memory[a16], H ← memory[a16+1].'],
+        ['SHLD a16','22','3','16','None','memory[a16] ← L, memory[a16+1] ← H.'],
+        ['LDAX B / D','0A 1A','1','7','None','A ← memory addressed by BC (or DE).'],
+        ['STAX B / D','02 12','1','7','None','memory addressed by BC (or DE) ← A.'],
+        ['XCHG','EB','1','4','None','Swap the contents of HL and DE.'],
+        ['ADD r','80–87','1','4 (7 M)','S Z AC P CY','A ← A + r.'],
+        ['ADC r','88–8F','1','4 (7 M)','S Z AC P CY','A ← A + r + carry.'],
+        ['ADI d8','C6','2','7','S Z AC P CY','A ← A + constant.'],
+        ['ACI d8','CE','2','7','S Z AC P CY','A ← A + constant + carry.'],
+        ['SUB r','90–97','1','4 (7 M)','S Z AC P CY','A ← A − r. CY = 1 means a borrow (A < r).'],
+        ['SBB r','98–9F','1','4 (7 M)','S Z AC P CY','A ← A − r − borrow.'],
+        ['SUI d8','D6','2','7','S Z AC P CY','A ← A − constant.'],
+        ['SBI d8','DE','2','7','S Z AC P CY','A ← A − constant − borrow.'],
+        ['INR r','04+8r','1','4 (10 M)','S Z AC P','r ← r + 1. Carry is NOT affected.'],
+        ['DCR r','05+8r','1','4 (10 M)','S Z AC P','r ← r − 1. Carry is NOT affected. Used for loop counters.'],
+        ['INX rp','03 13 23 33','1','6','None','16-bit register pair ← pair + 1 (no flags at all).'],
+        ['DCX rp','0B 1B 2B 3B','1','6','None','16-bit register pair ← pair − 1 (no flags at all).'],
+        ['DAD rp','09 19 29 39','1','10','CY','HL ← HL + rp (16-bit add). Only carry is affected.'],
+        ['DAA','27','1','4','S Z AC P CY','Decimal-adjust A after adding two BCD numbers.'],
+        ['ANA r','A0–A7','1','4 (7 M)','S Z P; CY=0, AC=1','A ← A AND r. Used to mask (clear) bits.'],
+        ['ANI d8','E6','2','7','S Z P; CY=0, AC=1','A ← A AND constant.'],
+        ['ORA r','B0–B7','1','4 (7 M)','S Z P; CY=0, AC=0','A ← A OR r. Used to set bits. ORA A tests A for zero.'],
+        ['ORI d8','F6','2','7','S Z P; CY=0, AC=0','A ← A OR constant.'],
+        ['XRA r','A8–AF','1','4 (7 M)','S Z P; CY=0, AC=0','A ← A XOR r. XRA A clears A and the carry.'],
+        ['XRI d8','EE','2','7','S Z P; CY=0, AC=0','A ← A XOR constant.'],
+        ['CMP r','B8–BF','1','4 (7 M)','S Z AC P CY','Compare A with r (computes A − r, throws the result away). Z=1: equal. CY=1: A < r.'],
+        ['CPI d8','FE','2','7','S Z AC P CY','Compare A with a constant.'],
+        ['RLC','07','1','4','CY','Rotate A left; bit 7 goes to CY and to bit 0.'],
+        ['RRC','0F','1','4','CY','Rotate A right; bit 0 goes to CY and to bit 7.'],
+        ['RAL','17','1','4','CY','Rotate A left through the carry (9-bit rotate).'],
+        ['RAR','1F','1','4','CY','Rotate A right through the carry (9-bit rotate).'],
+        ['CMA','2F','1','4','None','Complement A (1\'s complement).'],
+        ['CMC','3F','1','4','CY','Complement the carry flag.'],
+        ['STC','37','1','4','CY','Set the carry flag to 1.'],
+        ['JMP a16','C3','3','10','None','Jump to the address.'],
+        ['Jcc a16','C2 CA D2 DA E2 EA F2 FA','3','10 / 7','None','Jump if condition: JNZ JZ JNC JC JPO JPE JP JM (Z, CY, parity, sign).'],
+        ['CALL a16','CD','3','18','None','Push the return address on the stack, then jump.'],
+        ['Ccc a16','C4 CC D4 DC E4 EC F4 FC','3','18 / 9','None','Conditional call: CNZ CZ CNC CC CPO CPE CP CM.'],
+        ['RET','C9','1','10','None','Pop the return address from the stack into PC.'],
+        ['Rcc','C0 C8 D0 D8 E0 E8 F0 F8','1','12 / 6','None','Conditional return: RNZ RZ RNC RC RPO RPE RP RM.'],
+        ['RST n','C7+8n','1','12','None','Call the fixed vector n×8 (0000, 0008 … 0038). Used by interrupts.'],
+        ['PCHL','E9','1','6','None','PC ← HL (jump to the address in HL).'],
+        ['PUSH rp','C5 D5 E5 F5','1','12','None','Push BC, DE, HL or PSW (A + flags) onto the stack. SP decreases by 2.'],
+        ['POP rp','C1 D1 E1 F1','1','10','POP PSW: all','Pop two bytes off the stack into the pair (POP PSW restores A and the flags).'],
+        ['XTHL','E3','1','16','None','Exchange HL with the top of the stack.'],
+        ['SPHL','F9','1','6','None','SP ← HL.'],
+        ['IN p8','DB','2','10','None','A ← value on input port p8.'],
+        ['OUT p8','D3','2','10','None','Output port p8 ← A.'],
+        ['EI','FB','1','4','None','Enable interrupts (takes effect after the next instruction).'],
+        ['DI','F3','1','4','None','Disable interrupts.'],
+        ['RIM','20','1','4','None','Read interrupt masks/pending bits and the SID pin into A.'],
+        ['SIM','30','1','4','None','Set interrupt masks (A bits 0–2 when bit 3 = 1), reset RST7.5 (bit 4), drive SOD (bit 7 when bit 6 = 1).'],
+        ['HLT','76','1','5','None','Stop the CPU until an interrupt or reset.'],
+        ['NOP','00','1','4','None','Do nothing.']
+    ];
+    </script>
+
+    <!-- ===================== USER INTERFACE ===================== -->
+    <script>
+    const $ = id => document.getElementById(id);
+    const RLIST = ['A','B','C','D','E','H','L','SP','PC'];
+    const RIDX = { A: 7, B: 0, C: 1, D: 2, E: 3, H: 4, L: 5 };
+    const SPEEDS = [ { n: 1, ms: 500 }, { n: 1, ms: 100 }, { n: 1, ms: 20 }, { n: 200, ms: 16 }, { n: 50000, ms: 16 } ];
+
+    let lineOfAddr = {}, addrOfLine = {}, progStart = 0x8000, breakpoints = new Set(), errLines = new Set();
+    let running = false, timer = null, skipBp = false, follow = true, listBase = 0x8000, memBase = 0x8000;
+    let basic = true, touched = new Set(), lastBasicHtml = '', lastBasicCur = -1;
+    let activeTab = 'listing', trace = [], dirty = false, lastGutter = '', lastMsg = '';
+    const kit = { mode: 'step', addr: '0000', data: '00', memAddr: 0, edited: false, regIdx: 0 };
+    let prevRegs = {};
+
+    // ---------- Modal ----------
+    function showModal(msg) { $('custom-modal-msg').innerText = msg; $('custom-modal').classList.remove('hidden'); }
+    function closeModal() { $('custom-modal').classList.add('hidden'); }
+    function setMsg(t) { lastMsg = t; $('status-mid').textContent = t; }
+
+    // ---------- Registers panel ----------
+    function buildRegs() {
+        let h = '';
+        for (const n of ['A','B','C','D','E','H','L']) h += `<label class="reg-cell"><span>${n}</span><input class="reg-in" id="reg-${n}" maxlength="2" data-reg="${n}"></label>`;
+        h += `<div class="reg-cell" title="Memory byte addressed by HL"><span>M</span><div id="reg-M" class="reg-in" style="background:#f3f4f6">--</div></div>`;
+        h += `<label class="reg-cell col-span-2"><span style="width:20px">PC</span><input class="reg-in" id="reg-PC" maxlength="4" data-reg="PC"></label>`;
+        h += `<label class="reg-cell col-span-2"><span style="width:20px">SP</span><input class="reg-in" id="reg-SP" maxlength="4" data-reg="SP"></label>`;
+        $('reg-grid').innerHTML = h;
+        $('reg-grid').addEventListener('change', e => {
+            const n = e.target.dataset.reg; if (!n) return;
+            const v = parseInt(e.target.value, 16);
+            if (!isNaN(v)) setRegByName(n, v);
+            updateUI();
+        });
+        $('reg-grid').addEventListener('focusin', e => { if (e.target.select) e.target.select(); });
+    }
+    function getRegByName(n) { return n === 'SP' ? cpu.sp : n === 'PC' ? cpu.pc : cpu.r[RIDX[n]]; }
+    function setRegByName(n, v) { if (n === 'SP') cpu.sp = v & 0xFFFF; else if (n === 'PC') { cpu.pc = v & 0xFFFF; cpu.halted = false; } else cpu.r[RIDX[n]] = v & 255; }
+
+    function updateRegs() {
+        const cur = {};
+        for (const n of RLIST) {
+            const v = getRegByName(n); cur[n] = v;
+            const el = $('reg-' + n);
+            if (document.activeElement !== el) el.value = n === 'SP' || n === 'PC' ? hex4(v) : hex2(v);
+            el.classList.toggle('chg', prevRegs[n] !== undefined && prevRegs[n] !== v);
+        }
+        prevRegs = cur;
+        $('reg-M').textContent = hex2(rd(HL()));
+        $('reg-text').textContent = 'A=' + hex2(cpu.r[7]) + ' B=' + hex2(cpu.r[0]) + ' C=' + hex2(cpu.r[1]) + ' D=' + hex2(cpu.r[2]) + ' E=' + hex2(cpu.r[3]) + ' H=' + hex2(cpu.r[4]) + ' L=' + hex2(cpu.r[5]) +
+            '\nPC=' + hex4(cpu.pc) + ' SP=' + hex4(cpu.sp) + '\nM=' + hex2(rd(HL())) + ' IE=' + cpu.ie;
+        for (const td of document.querySelectorAll('#flag-row .flag-cell')) {
+            const v = cpu[td.dataset.flag]; td.textContent = v; td.classList.toggle('on', !!v);
+        }
+        $('flag-byte').textContent = hex2(getF());
+        $('cnt-instr').textContent = cpu.icount; $('cnt-t').textContent = cpu.tstates;
+        $('cnt-time').textContent = (cpu.tstates / 3).toFixed(1) + ' µs';
+        const L = (id, on) => $(id).classList.toggle('on', !!on);
+        L('led-ie', cpu.ie); L('led-m75', cpu.m75); L('led-m65', cpu.m65); L('led-m55', cpu.m55); L('led-sod', cpu.sod); L('led-sid', cpu.sid);
+        L('led-p75', cpu.p75); L('led-p65', cpu.p65); L('led-p55', cpu.p55); L('led-trap', cpu.trap); L('led-intr', cpu.intr >= 0);
+        updateIO();
+    }
+    document.addEventListener('click', e => {
+        const td = e.target.closest && e.target.closest('.flag-cell');
+        if (td) { cpu[td.dataset.flag] ^= 1; updateUI(); }
+    });
+
+    // ---------- I/O ----------
+    function buildIO() {
+        let h = '';
+        for (let b = 7; b >= 0; b--) h += `<span class="led sw" data-bit="${b}" title="bit ${b}"></span>`;
+        $('io-switches').innerHTML = h;
+        $('io-switches').addEventListener('click', e => {
+            const b = e.target.dataset && e.target.dataset.bit; if (b === undefined) return;
+            cpu.ioIn[ioPort()] ^= (1 << +b); updateIO();
+        });
+        $('io-port').addEventListener('change', () => { $('io-port').value = hex2(ioPort()); updateIO(); });
+        $('led-sid').addEventListener('click', () => { cpu.sid ^= 1; updateUI(); });
+    }
+    function ioPort() { const v = parseInt($('io-port').value, 16); return isNaN(v) ? 0 : v & 255; }
+    function updateIO() {
+        const p = ioPort(), v = cpu.ioIn[p];
+        for (const s of $('io-switches').children) s.classList.toggle('on', !!(v >> +s.dataset.bit & 1));
+        $('io-in-hex').textContent = hex2(v);
+        const ports = Array.from(cpu.outUsed).sort((a, b) => a - b);
+        if (!ports.length) { $('io-out').innerHTML = '<span class="text-gray-400">No OUT instruction executed yet.</span>'; return; }
+        let h = '';
+        for (const q of ports) {
+            const o = cpu.ioOut[q]; let leds = '';
+            for (let b = 7; b >= 0; b--) leds += `<span class="led ${(o >> b & 1) ? 'on' : ''}"></span> `;
+            h += `<div class="flex items-center gap-2"><span>OUT port ${hex2(q)}</span>${leds}<b>${hex2(o)}</b><span class="text-gray-500">(${o})</span></div>`;
+        }
+        if ($('io-out').innerHTML !== h) $('io-out').innerHTML = h;
+    }
+
+    // ---------- Interrupt buttons ----------
+    function triggerInt(k) {
+        if (k === 'trap') cpu.trap = 1; else if (k === '75') cpu.p75 = 1; else if (k === '65') cpu.p65 = 1; else if (k === '55') cpu.p55 = 1;
+        else if (k === 'intr') cpu.intr = +$('intr-n').value;
+        setStatusRight('<INT ' + k.toUpperCase() + '>');
+        if (pendingAccepted()) {
+            if (!running && cpu.halted) { setMsg('Interrupt accepted — waking the CPU'); startRun(); return; }
+            setMsg('Interrupt pending — it is taken before the next instruction');
+        } else if (k !== 'trap') {
+            setMsg(cpu.ie ? 'Interrupt latched but masked — use SIM to unmask it' : 'Interrupt latched, but interrupts are disabled — run EI');
+        }
+        updateUI();
+    }
+
+    // ---------- Trainer kit keypad ----------
+    function setStatusRight(t) { $('status-right').textContent = 'Previous Function: ' + t.replace(/</g, '<').replace(/>/g, '>'); }
+    function handleHexInput(ch) {
+        const hexChar = ch;
+        $('status-left').textContent = 'Key pressed: ' + ch;
+        const m = kit.mode;
+        if (m === 'memAddr' || m === 'goAddr') kit.addr = kit.addr.substring(1) + ch;
+        else if (m === 'memData') { kit.data = kit.data.substring(1) + ch; kit.edited = true; }
+        else if (m === 'reg') {
+            const is16 = RLIST[kit.regIdx] === 'SP' || RLIST[kit.regIdx] === 'PC';
+            if (is16) kit.addr = kit.addr.substring(1) + ch; else kit.data = kit.data.substring(1) + ch;
+            kit.edited = true;
+        } else { kit.mode = 'memAddr'; kit.addr = hex4(cpu.pc); kit.addr = kit.addr.substring(1) + hexChar; kit.edited = false; setMsg('Typing an address — press Next to open its data byte'); }
+        updateUI();
+    }
+    function loadRegDisplay() {
+        const n = RLIST[kit.regIdx], v = getRegByName(n);
+        if (n === 'SP' || n === 'PC') kit.addr = hex4(v); else kit.data = hex2(v);
+        kit.edited = false;
+    }
+    function commitEdit() {
+        if (!kit.edited) return;
+        if (kit.mode === 'memData') { cpu.mem[kit.memAddr] = parseInt(kit.data, 16); touched.add(kit.memAddr); }
+        else if (kit.mode === 'reg') {
+            const n = RLIST[kit.regIdx], is16 = n === 'SP' || n === 'PC';
+            setRegByName(n, parseInt(is16 ? kit.addr : kit.data, 16));
+        }
+        kit.edited = false;
+    }
+    function handleCommand(cmd) {
+        setStatusRight('<' + cmd.toUpperCase() + '>');
+        $('status-left').textContent = 'Key pressed: ' + cmd;
+        if (running && cmd !== 'Exec') stopRun('Paused');
+        switch (cmd) {
+            case 'Reset':
+                stopRun(); hardReset(); kit.mode = 'memAddr'; kit.addr = '0000'; kit.edited = false; setMsg('RESET: PC = 0000, interrupts disabled and masked (registers and memory untouched)'); break;
+            case 'Kbint':
+                stopRun('Keyboard interrupt — stopped at ' + hex4(cpu.pc)); kit.mode = 'step'; break;
+            case 'ExamMem':
+                commitEdit(); if (kit.mode !== 'memAddr' && kit.mode !== 'memData') kit.addr = hex4(cpu.pc); else kit.addr = hex4(kit.mode === 'memData' ? kit.memAddr : parseInt(kit.addr, 16));
+                kit.mode = 'memAddr'; kit.edited = false; break;
+            case 'ExamReg':
+                commitEdit(); kit.mode = 'reg'; kit.regIdx = 0; loadRegDisplay(); break;
+            case 'Next': case 'Prev': {
+                const d = cmd === 'Next' ? 1 : -1;
+                if (kit.mode === 'memAddr') {
+                    if (cmd === 'Next') { kit.memAddr = parseInt(kit.addr, 16); kit.data = hex2(cpu.mem[kit.memAddr]); kit.edited = false; kit.mode = 'memData'; }
+                    else kit.addr = hex4(parseInt(kit.addr, 16) - 1);
+                } else if (kit.mode === 'memData') {
+                    commitEdit(); kit.memAddr = (kit.memAddr + d) & 0xFFFF; kit.addr = hex4(kit.memAddr); kit.data = hex2(cpu.mem[kit.memAddr]);
+                } else if (kit.mode === 'reg') {
+                    commitEdit(); kit.regIdx = (kit.regIdx + d + RLIST.length) % RLIST.length; loadRegDisplay();
+                } else setMsg('Use Exam Mem or Exam Reg first, then Next / Prev');
+                break; }
+            case 'Go':
+                commitEdit(); kit.mode = 'goAddr'; kit.addr = hex4(cpu.pc); break;
+            case 'Exec':
+                if (kit.mode === 'goAddr') { cpu.pc = parseInt(kit.addr, 16); cpu.halted = false; }
+                else commitEdit();
+                startRun(); return;
+            case 'Step':
+                commitEdit(); if (kit.mode === 'goAddr') { cpu.pc = parseInt(kit.addr, 16); cpu.halted = false; }
+                doStep(); return;
+        }
+        updateUI();
+    }
+    function renderKit() {
+        if (kit.mode === 'step') { kit.addr = hex4(cpu.pc); kit.data = hex2(cpu.mem[cpu.pc]); }
+        let a = kit.addr, d = kit.data, h = '';
+        switch (kit.mode) {
+            case 'memAddr': d = hex2(cpu.mem[parseInt(kit.addr, 16)]); h = '<b>EXAM MEM</b> — type a 4-digit address, then press <b>Next</b> to open its data byte.'; break;
+            case 'memData': a = hex4(kit.memAddr); h = '<b>EXAM MEM</b> — type 2 hex digits to change the byte. <b>Next</b> stores &amp; advances, <b>Prev</b> stores &amp; goes back.'; break;
+            case 'reg': {
+                const n = RLIST[kit.regIdx], is16 = n === 'SP' || n === 'PC';
+                a = is16 ? kit.addr : ('r-' + n).padEnd(4, ' '); d = is16 ? '--' : kit.data;
+                h = `<b>EXAM REG</b> — register <b>${n}</b>. Type a new value, <b>Next</b>/<b>Prev</b> switch register (A B C D E H L SP PC).`; break; }
+            case 'goAddr': d = '--'; h = '<b>GO</b> — type the start address, then press <b>Exec</b> to run (or <b>Step</b> to trace).'; break;
+            default: h = running ? '<b>RUNNING</b> — display follows PC / opcode.' : cpu.halted ? '<b>HALTED</b> — Reset, Restart, or trigger an enabled interrupt.' : 'Display shows <b>PC</b> and the <b>opcode</b> at that address. <b>Step</b> runs one instruction.';
+        }
+        $('display-address').textContent = a; $('display-data').textContent = d; $('kit-hint').innerHTML = h;
+    }
+
+    // ---------- Execution control ----------
+    function snap() { return { r: Array.from(cpu.r), sp: cpu.sp, f: getF(), ie: cpu.ie }; }
+    function diffText(b, a) {
+        const p = [], nm = ['B','C','D','E','H','L','','A'];
+        for (const i of [7, 0, 1, 2, 3, 4, 5]) if (b.r[i] !== a.r[i]) p.push(nm[i] + ' ' + hex2(b.r[i]) + '→' + hex2(a.r[i]));
+        for (const [n, m] of [['S',0x80],['Z',0x40],['AC',0x10],['P',0x04],['CY',0x01]]) if ((b.f & m) !== (a.f & m)) p.push(n + '=' + ((a.f & m) ? 1 : 0));
+        if (b.sp !== a.sp) p.push('SP ' + hex4(b.sp) + '→' + hex4(a.sp));
+        if (b.ie !== a.ie) p.push('IE=' + a.ie);
+        for (const w of cpu.writes) p.push('[' + hex4(w) + ']←' + hex2(cpu.mem[w]));
+        if (cpu.lastOut) p.push('OUT ' + hex2(cpu.lastOut.port) + ' ← ' + hex2(cpu.lastOut.val));
+        return p.join('   ');
+    }
+    function execOne(withTrace) {
+        let d, b;
+        if (withTrace) { d = disasm(cpu.pc); b = snap(); }
+        const info = step();
+        if (withTrace && !info.idle) {
+            const e = { n: cpu.icount, pc: info.pc, t: info.cyc };
+            if (info.int) { e.text = 'INTERRUPT ' + info.int; e.diff = 'push PC, jump to ' + hex4(cpu.pc) + '   ' + diffText(b, snap()); }
+            else { e.text = d.text; e.diff = diffText(b, snap()); }
+            trace.push(e); if (trace.length > 300) trace.shift();
+        }
+        return info;
+    }
+    function doStep() {
+        if (cpu.halted && !pendingAccepted()) { setMsg('CPU is halted (HLT). Reset/Restart or raise an enabled interrupt.'); kit.mode = 'step'; updateUI(); return; }
+        execOne(true); kit.mode = 'step';
+        if (cpu.halted) setMsg('HLT executed — CPU halted');
+        updateUI();
+    }
+    function stepOver() {
+        if (running) stopRun('Paused');
+        const op = cpu.mem[cpu.pc], isCall = op === 0xCD || (op & 0xC7) === 0xC4;
+        if (!isCall) { doStep(); return; }
+        const target = (cpu.pc + 3) & 0xFFFF, spBefore = cpu.sp;
+        execOne(true);
+        let n = 0, hitBp = false;
+        if (cpu.pc !== target || cpu.sp !== spBefore) {
+            while (n++ < 5000000) {
+                if (cpu.pc === target && cpu.sp === spBefore) break;
+                if (breakpoints.has(cpu.pc)) { hitBp = true; break; }
+                const i = execOne(false); if (cpu.halted && !pendingAccepted()) break;
+            }
+        }
+        kit.mode = 'step';
+        setMsg(hitBp ? 'Breakpoint at ' + hex4(cpu.pc) : n >= 5000000 ? 'Step Over gave up after 5,000,000 instructions' : 'Stepped over CALL');
+        updateUI();
+    }
+    function startRun() {
+        if (running) return;
+        if (cpu.halted && !pendingAccepted()) { setMsg('CPU is halted. Use Restart / Reset, or trigger an enabled interrupt.'); kit.mode = 'step'; updateUI(); return; }
+        running = true; skipBp = true; kit.mode = 'step'; setMsg('Running…'); setStatusRight('<RUN>');
+        tick();
+    }
+    function tick() {
+        if (!running) return;
+        const sp = SPEEDS[basic ? 4 : +$('speed').value], withTrace = sp.n <= 200;
+        let why = null;
+        for (let i = 0; i < sp.n; i++) {
+            if (!skipBp && breakpoints.has(cpu.pc)) { why = 'Breakpoint at ' + hex4(cpu.pc); break; }
+            skipBp = false;
+            execOne(withTrace);
+            if (cpu.halted && !pendingAccepted()) { why = 'HLT — CPU halted'; break; }
+        }
+        if (why) { stopRun(why); return; }
+        updateUI();
+        timer = setTimeout(tick, sp.ms);
+    }
+    function stopRun(why) {
+        const was = running;
+        running = false; clearTimeout(timer); timer = null;
+        if (why) setMsg(why);
+        if (was || why) updateUI();
+    }
+    function restartProgram() {
+        stopRun(); restartCpu(progStart); trace = []; kit.mode = 'step'; setMsg('Restarted: registers cleared, PC = ' + hex4(progStart)); listBase = progStart; updateUI();
+    }
+    function clearMemory() { cpu.mem.fill(0); touched.clear(); setMsg('Memory cleared'); updateUI(); }
+    function clearTrace() { trace = []; renderTrace(); }
+
+    // ---------- Assemble & load ----------
+    function assembleAndLoad() {
+        stopRun();
+        const res = assemble($('editor').value);
+        errLines = new Set(res.errors.map(e => e.line));
+        lineOfAddr = res.lineOfAddr; addrOfLine = res.addrOfLine; dirty = false;
+        if (!res.ok) {
+            $('asm-msg').innerHTML = res.errors.map(e => `<div class="msg-err cursor-pointer" onclick="gotoLine(${e.line})">Line ${e.line + 1}: ${escapeHtml(e.msg)}</div>`).join('');
+            setMsg('Assembly failed — ' + res.errors.length + ' error(s)'); updateUI(); return false;
+        }
+        if (!res.count) { $('asm-msg').innerHTML = '<span class="msg-err">Nothing to assemble — the program is empty.</span>'; updateUI(); return false; }
+        cpu.mem.fill(0);
+        touched.clear(); res.bytes.forEach((v, a) => { cpu.mem[a] = v; touched.add(a); });
+        progStart = res.start; restartCpu(progStart); trace = [];
+        const syms = Object.keys(res.symbols).filter(k => !/^[0-9]/.test(k)).map(k => `${k}=${hex4(res.symbols[k])}`).join('  ');
+        $('asm-msg').innerHTML = `<div class="msg-ok">Assembled ${res.count} byte(s), ${hex4(res.lo)}H–${hex4(res.hi)}H. PC set to ${hex4(progStart)}H. Ready to Run or Step.</div>` + (syms ? `<div class="text-gray-600">Symbols: ${escapeHtml(syms)}</div>` : '');
+        kit.mode = 'step'; listBase = progStart; follow = true; $('list-follow').checked = true; memBase = progStart & 0xFFF0;
+        setMsg('Program loaded at ' + hex4(progStart)); setStatusRight('<ASSEMBLE>'); switchTab('listing');
+        return true;
+    }
+    function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function gotoLine(n) {
+        const ta = $('editor'), lines = ta.value.split('\n'); let pos = 0;
+        for (let i = 0; i < n; i++) pos += lines[i].length + 1;
+        ta.focus(); ta.setSelectionRange(pos, pos + (lines[n] || '').length); ta.scrollTop = Math.max(0, n * 20 - 80);
+    }
+
+    // ---------- Editor gutter ----------
+    function updateGutter() {
+        const n = $('editor').value.split('\n').length, cur = dirty ? undefined : lineOfAddr[cpu.pc];
+        const bpl = new Set(); if (!dirty) breakpoints.forEach(a => { if (lineOfAddr[a] !== undefined) bpl.add(lineOfAddr[a]); });
+        let h = '';
+        for (let i = 0; i < n; i++) {
+            let c = 'gl'; if (errLines.has(i)) c += ' err'; if (cur === i) c += ' cur'; if (bpl.has(i)) c += ' bp';
+            h += `<div class="${c}" data-ln="${i}">${cur === i ? '▶' : bpl.has(i) ? '●' : ''}<span>${i + 1}</span></div>`;
+        }
+        if (h !== lastGutter) { $('gutter').innerHTML = h; lastGutter = h; }
+        $('gutter').scrollTop = $('editor').scrollTop;
+    }
+
+    // ---------- Tabs ----------
+    function switchTab(t) {
+        activeTab = t;
+        for (const b of document.querySelectorAll('.tab-btn')) b.classList.toggle('active', b.dataset.tab === t);
+        for (const id of ['listing','memory','trace','ref']) $('tab-' + id).classList.toggle('hidden', id !== t);
+        updateUI();
+    }
+    function renderListing() {
+        const ROWS = 30;
+        const build = base => { const out = []; let a = base; for (let i = 0; i < ROWS; i++) { const d = disasm(a); out.push(d); a = (a + d.len) & 0xFFFF; } return out; };
+        let rows = build(listBase);
+        if (follow) {
+            const idx = rows.findIndex(r => r.addr === cpu.pc);
+            if (idx < 0 || idx >= ROWS - 3) { listBase = cpu.pc; rows = build(listBase); }
+        }
+        if (document.activeElement !== $('list-from')) $('list-from').value = hex4(listBase);
+        let h = '';
+        for (const d of rows) {
+            const isPc = d.addr === cpu.pc, bp = breakpoints.has(d.addr);
+            h += `<tr class="${isPc ? 'cur' : ''}" data-a="${d.addr}"><td class="bp">${bp ? '●' : ''}</td><td class="addr" title="Set PC here">${hex4(d.addr)}</td><td>${d.bytes.map(hex2).join(' ')}</td><td>${isPc ? '▶ ' : ''}${escapeHtml(d.text)}</td><td>${d.e ? d.len : ''}</td><td>${d.e ? tLabel(d.op) : ''}</td></tr>`;
+        }
+        $('listing-body').innerHTML = h;
+    }
+    function buildMemTable() {
+        let h = '<thead><tr><th class="px-1"></th>';
+        for (let i = 0; i < 16; i++) h += `<th class="text-gray-500 font-normal">${i.toString(16).toUpperCase()}</th>`;
+        h += '<th class="pl-2 font-normal text-gray-500 text-left">ASCII</th></tr></thead><tbody>';
+        for (let r = 0; r < 16; r++) {
+            h += `<tr><td class="pr-2 text-gray-500" id="mr-${r}"></td>`;
+            for (let c = 0; c < 16; c++) h += `<td><input class="mc" id="mc-${r * 16 + c}" maxlength="2" data-o="${r * 16 + c}"></td>`;
+            h += `<td class="pl-2 text-gray-600" id="ma-${r}"></td></tr>`;
+        }
+        $('mem-table').innerHTML = h + '</tbody>';
+        $('mem-table').addEventListener('change', e => {
+            const o = e.target.dataset.o; if (o === undefined) return;
+            const v = parseInt(e.target.value, 16); if (!isNaN(v)) { cpu.mem[(memBase + +o) & 0xFFFF] = v & 255; touched.add((memBase + +o) & 0xFFFF); }
+            updateUI();
+        });
+        $('mem-table').addEventListener('focusin', e => { if (e.target.select) e.target.select(); });
+    }
+    function renderMemory() {
+        if (document.activeElement !== $('mem-from')) $('mem-from').value = hex4(memBase);
+        const hl = HL(), wset = new Set(cpu.writes);
+        for (let r = 0; r < 16; r++) {
+            $('mr-' + r).textContent = hex4(memBase + r * 16); let asc = '';
+            for (let c = 0; c < 16; c++) {
+                const a = (memBase + r * 16 + c) & 0xFFFF, el = $('mc-' + (r * 16 + c)), v = cpu.mem[a];
+                if (document.activeElement !== el) el.value = hex2(v);
+                el.className = 'mc' + (a === cpu.pc ? ' pc' : a === hl ? ' hl' : a === cpu.sp ? ' sp' : wset.has(a) ? ' wr' : '');
+                asc += (v >= 32 && v < 127) ? String.fromCharCode(v) : '.';
+            }
+            $('ma-' + r).textContent = asc;
+        }
+    }
+    function memPage(d) { memBase = (memBase + d * 256) & 0xFFFF; updateUI(); }
+    function memJump(w) { memBase = ((w === 'pc' ? cpu.pc : w === 'hl' ? HL() : cpu.sp) & 0xFFF0); updateUI(); }
+    function renderTrace() {
+        let h = '';
+        for (let i = trace.length - 1; i >= 0; i--) {
+            const e = trace[i];
+            h += `<tr><td class="border border-gray-300 px-1">${e.n}</td><td class="border border-gray-300 px-1">${hex4(e.pc)}</td><td class="border border-gray-300 px-1">${escapeHtml(e.text)}</td><td class="border border-gray-300 px-1">${e.t}</td><td class="border border-gray-300 px-1 text-gray-700">${escapeHtml(e.diff)}</td></tr>`;
+        }
+        $('trace-body').innerHTML = h || '<tr><td colspan="5" class="p-2 text-gray-500">Nothing executed yet. Step or Run a program (traces are recorded at ≤ 50 instr/s … ~12k instr/s; not at Max).</td></tr>';
+    }
+    function renderRef() {
+        const q = $('ref-search').value.trim().toLowerCase();
+        let h = '';
+        for (const r of REF) {
+            if (q && !r.join(' ').toLowerCase().includes(q)) continue;
+            h += `<tr class="ref-row"><td class="border border-gray-300 px-1 font-mono font-bold whitespace-nowrap">${escapeHtml(r[0])}</td><td class="border border-gray-300 px-1 font-mono">${r[1]}</td><td class="border border-gray-300 px-1">${r[2]}</td><td class="border border-gray-300 px-1 whitespace-nowrap">${r[3]}</td><td class="border border-gray-300 px-1 whitespace-nowrap">${r[4]}</td><td class="border border-gray-300 px-1">${escapeHtml(r[5])}</td></tr>`;
+        }
+        $('ref-body').innerHTML = h || '<tr><td colspan="6" class="p-2 text-gray-500">No instruction matches.</td></tr>';
+    }
+
+    // ---------- Basic mode ----------
+    function setMode(m) {
+        basic = m !== 'adv';
+        document.body.classList.toggle('basic', basic);
+        $('mode-basic').classList.toggle('on', basic); $('mode-adv').classList.toggle('on', !basic);
+        try { localStorage.setItem('8085sim_mode', basic ? 'basic' : 'adv'); } catch (e) {}
+        lastBasicHtml = '';
+        updateUI();
+    }
+    function basicText(d) {
+        if (!d.e) return '';
+        const ops = d.e.ops.slice();
+        if (d.e.imm === 'd8') ops.push('8 bit'); else if (d.e.imm) ops.push('16 bit');
+        return d.e.mn + (ops.length ? ' ' + ops.join(',') : '');
+    }
+    function renderBasic() {
+        const sorted = Array.from(touched).sort((x, y) => x - y), rows = [];
+        let i = 0;
+        while (i < sorted.length && rows.length < 3000) {
+            const a = sorted[i], d = disasm(a);
+            for (let k = 0; k < d.len && a + k < 65536; k++) rows.push({ a: a + k, v: cpu.mem[a + k], t: k === 0 ? basicText(d) : '', n: k === 0 && d.e ? d.len : '' });
+            const next = a + d.len; while (i < sorted.length && sorted[i] < next) i++;
+        }
+        const cur = kit.mode === 'memData' ? kit.memAddr : cpu.pc, td = 'class="border border-gray-300"';
+        let h = '';
+        for (const r of rows) h += `<tr data-a="${r.a}" class="${r.a === cur ? 'bcur' : ''}"><td>${hex4(r.a)}</td><td>${hex2(r.v)}</td><td>${escapeHtml(r.t)}</td><td>${r.n}</td></tr>`;
+        for (let k = rows.length; k < 14; k++) h += '<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>';
+        if (h !== lastBasicHtml || cur !== lastBasicCur) {
+            if (h !== lastBasicHtml) { $('basic-body').innerHTML = h; lastBasicHtml = h; }
+            lastBasicCur = cur;
+            const tr = $('basic-body').querySelector('tr.bcur'), c = $('basic-scroll');
+            if (tr && c && (tr.offsetTop < c.scrollTop + 28 || tr.offsetTop + tr.offsetHeight > c.scrollTop + c.clientHeight)) c.scrollTop = Math.max(0, tr.offsetTop - c.clientHeight / 2);
+        }
+        // stack: only entries pushed since the last restart
+        let sh = '', a = cpu.sp, n = 0;
+        if (cpu.stackW.size) {
+            while (cpu.stackW.has(a) && n++ < 64) { sh += `<tr><td class="text-red-800">${hex4(a)}</td><td>${hex2(cpu.mem[a])}</td></tr>`; a = (a + 1) & 0xFFFF; }
+            sh += `<tr><td class="text-red-800">${hex4(a)}</td><td>XX</td></tr>`; n++;
+        }
+        for (; n < 4; n++) sh += '<tr><td>&nbsp;</td><td></td></tr>';
+        if ($('stack-body').innerHTML !== sh) $('stack-body').innerHTML = sh;
+    }
+    function showRow() {
+        const rows = $('basic-body').querySelectorAll('tr[data-a]'), n = parseInt($('row-num').value, 10);
+        if (!rows.length) { setMsg('The debug table is empty — enter a program with Exam Mem first'); return; }
+        if (!n || n < 1 || n > rows.length) { setMsg('Row number must be between 1 and ' + rows.length); return; }
+        const tr = rows[n - 1], c = $('basic-scroll');
+        c.scrollTop = Math.max(0, tr.offsetTop - c.clientHeight / 2);
+        tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1200);
+    }
+    function newAll() {
+        stopRun(); cpu.mem.fill(0); touched.clear(); restartCpu(0); trace = []; prevRegs = {};
+        kit.mode = 'memAddr'; kit.addr = '0000'; kit.edited = false; lastBasicHtml = '';
+        setMsg('Cleared: memory, registers and stack'); updateUI();
+    }
+    function flashKey(t) {
+        for (const b of document.querySelectorAll('.key-btn')) if (b.textContent.trim() === t) { b.classList.add('kflash'); setTimeout(() => b.classList.remove('kflash'), 130); break; }
+    }
+
+    // ---------- Master UI refresh ----------
+    function updateUI() {
+        renderKit(); updateRegs();
+        if (basic) renderBasic();
+        else {
+            updateGutter();
+            if (activeTab === 'listing') renderListing();
+            else if (activeTab === 'memory') renderMemory();
+            else if (activeTab === 'trace') renderTrace();
+        }
+        const chip = $('run-chip');
+        chip.textContent = running ? 'RUNNING' : cpu.halted ? 'HALTED' : 'READY';
+        chip.className = 'text-xs font-bold px-2 py-0.5 rounded ' + (running ? 'bg-green-600 text-white' : cpu.halted ? 'bg-red-600 text-white' : 'bg-gray-300 text-gray-700');
+        $('btn-run').disabled = running; $('btn-pause').disabled = !running;
+    }
+
+    // ---------- Save / Load ----------
+    function serialize() {
+        const ranges = []; let i = 0;
+        while (i < 65536) {
+            if (cpu.mem[i]) { let j = i; while (j < 65536 && cpu.mem[j]) j++; let s = ''; for (let k = i; k < j; k++) s += hex2(cpu.mem[k]); ranges.push({ a: i, h: s }); i = j; } else i++;
+        }
+        return JSON.stringify({ v: 1, r: Array.from(cpu.r), sp: cpu.sp, pc: cpu.pc, f: getF(), ie: cpu.ie, m: [cpu.m55, cpu.m65, cpu.m75], p: [cpu.p55, cpu.p65, cpu.p75], sid: cpu.sid, sod: cpu.sod,
+            halted: cpu.halted, t: cpu.tstates, n: cpu.icount, ioIn: Array.from(cpu.ioIn), ioOut: Array.from(cpu.ioOut), outUsed: Array.from(cpu.outUsed),
+            mem: ranges, src: $('editor').value, bps: Array.from(breakpoints), start: progStart });
+    }
+    function deserialize(json) {
+        const s = JSON.parse(json); stopRun();
+        cpu.mem.fill(0); touched.clear(); for (const r of s.mem) for (let k = 0; k < r.h.length / 2; k++) { cpu.mem[r.a + k] = parseInt(r.h.substr(k * 2, 2), 16); touched.add(r.a + k); }
+        cpu.r.set(s.r); cpu.sp = s.sp; cpu.pc = s.pc; setF(s.f); cpu.ie = s.ie; cpu.ieNext = 0;
+        [cpu.m55, cpu.m65, cpu.m75] = s.m; [cpu.p55, cpu.p65, cpu.p75] = s.p; cpu.sid = s.sid; cpu.sod = s.sod;
+        cpu.halted = !!s.halted; cpu.tstates = s.t; cpu.icount = s.n; cpu.ioIn.set(s.ioIn); cpu.ioOut.set(s.ioOut); cpu.outUsed = new Set(s.outUsed);
+        cpu.trap = 0; cpu.intr = -1;
+        $('editor').value = s.src; breakpoints = new Set(s.bps); progStart = s.start;
+        const res = assemble(s.src); lineOfAddr = res.lineOfAddr; addrOfLine = res.addrOfLine; errLines = new Set(); dirty = false;
+        trace = []; kit.mode = 'step'; listBase = cpu.pc; follow = true; $('list-follow').checked = true; prevRegs = {};
+    }
+    function storageMode() { return (window.cloudApi && window.cloudApi.ready()) ? 'cloud' : 'local'; }
+    window.refreshStorageLabel = () => { $('storage-label').textContent = storageMode() === 'cloud' ? 'Storage: Firebase cloud' : 'Storage: this browser (Firebase not configured)'; };
+    async function saveState() {
+        try {
+            const json = serialize();
+            if (storageMode() === 'cloud') { await window.cloudApi.save(json); showModal('State saved to Cloud Storage successfully!'); }
+            else { localStorage.setItem('8085sim_state', json); showModal('State saved in this browser (cloud storage is not configured).'); }
+        } catch (e) { showModal('Error saving: ' + e.message); }
+    }
+    async function loadState() {
+        try {
+            const json = storageMode() === 'cloud' ? await window.cloudApi.load() : localStorage.getItem('8085sim_state');
+            if (!json) { showModal('No saved state found.'); return; }
+            deserialize(json); updateUI(); showModal('State loaded: registers, memory, program and breakpoints restored.');
+        } catch (e) { showModal('Error loading: ' + e.message); }
+    }
+    function downloadAsm() {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('editor').value], { type: 'text/plain' }));
+        a.download = 'program.asm'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    // ---------- Init & events ----------
+    function init() {
+        buildRegs(); buildIO(); buildMemTable(); renderRef();
+        $('sample-select').innerHTML = '<option value="">Load example…</option>' + SAMPLES.map((s, i) => `<option value="${i}">${escapeHtml(s.name)}</option>`).join('');
+        $('sample-select').addEventListener('change', e => {
+            if (e.target.value === '') return;
+            $('editor').value = SAMPLES[+e.target.value].code; e.target.value = ''; onEditorInput(); assembleAndLoad();
+        });
+        $('editor').value = '';
+        const ed = $('editor');
+        ed.addEventListener('scroll', () => { $('gutter').scrollTop = ed.scrollTop; });
+        ed.addEventListener('input', onEditorInput);
+        ed.addEventListener('keydown', e => {
+            if (e.key === 'Tab') { e.preventDefault(); const s = ed.selectionStart; ed.setRangeText('        ', s, ed.selectionEnd, 'end'); onEditorInput(); }
+            else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); assembleAndLoad(); }
+        });
+        $('gutter').addEventListener('click', e => {
+            const g = e.target.closest('.gl'); if (!g || dirty) return;
+            const a = addrOfLine[+g.dataset.ln]; if (a === undefined) return;
+            if (breakpoints.has(a)) breakpoints.delete(a); else breakpoints.add(a); updateUI();
+        });
+        $('tabs').addEventListener('click', e => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab); });
+        $('listing-body').addEventListener('click', e => {
+            const tr = e.target.closest('tr'); if (!tr) return; const a = +tr.dataset.a;
+            if (e.target.classList.contains('bp')) { if (breakpoints.has(a)) breakpoints.delete(a); else breakpoints.add(a); }
+            else if (e.target.classList.contains('addr')) { cpu.pc = a; cpu.halted = false; kit.mode = 'step'; setMsg('PC set to ' + hex4(a)); }
+            updateUI();
+        });
+        $('list-from').addEventListener('change', () => { const v = parseInt($('list-from').value, 16); if (!isNaN(v)) { listBase = v & 0xFFFF; follow = false; $('list-follow').checked = false; } updateUI(); });
+        $('list-follow').addEventListener('change', e => { follow = e.target.checked; updateUI(); });
+        $('mem-from').addEventListener('change', () => { const v = parseInt($('mem-from').value, 16); if (!isNaN(v)) memBase = v & 0xFFF0; updateUI(); });
+        $('ref-search').addEventListener('input', renderRef);
+        $('file-asm').addEventListener('change', e => {
+            const f = e.target.files[0]; if (!f) return;
+            const rd = new FileReader(); rd.onload = () => { $('editor').value = rd.result; onEditorInput(); assembleAndLoad(); }; rd.readAsText(f); e.target.value = '';
+        });
+        document.addEventListener('keydown', e => {
+            const t = e.target.tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (/^[0-9a-fA-F]$/.test(e.key)) { flashKey(e.key.toUpperCase()); handleHexInput(e.key.toUpperCase()); }
+            else if (e.key === 'ArrowRight') { e.preventDefault(); flashKey('Next'); handleCommand('Next'); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); flashKey('Prev'); handleCommand('Prev'); }
+            else if (e.key === 'F5') { e.preventDefault(); startRun(); }
+            else if (e.key === 'F10') { e.preventDefault(); handleCommand('Step'); }
+            else if (e.key === 'F11') { e.preventDefault(); stepOver(); }
+            else if (e.key === 'Escape') { if (running) { flashKey('Kbint'); handleCommand('Kbint'); } }
+            else if (e.key === 'Enter') { e.preventDefault(); flashKey('Exec'); handleCommand('Exec'); }
+            else {
+                const km = { m: ['ExamMem', 'Exam Mem'], x: ['ExamReg', 'Exam Reg'], g: ['Go', 'Go'], r: ['Reset', 'Reset'], s: ['Step', ''] }[e.key.toLowerCase()];
+                if (km) { e.preventDefault(); flashKey(km[1]); handleCommand(km[0]); }
+            }
+        });
+        window.refreshStorageLabel();
+        restartCpu(0); kit.mode = 'memAddr'; kit.addr = '0000';
+        let m = 'basic'; try { m = localStorage.getItem('8085sim_mode') || 'basic'; } catch (e) {}
+        setMode(m);
+    }
+    function onEditorInput() {
+        dirty = true; errLines = new Set(); updateGutter();
+        if ($('asm-msg').innerHTML) $('asm-msg').innerHTML = '<span class="text-gray-500">Source changed — press <b>Assemble &amp; Load</b> (Ctrl+Enter) to apply.</span>';
+    }
+    init();
+    </script>
+</body>
+</html>

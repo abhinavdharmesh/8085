@@ -18,7 +18,7 @@
         /* Digital display styling */
         .digital-display {
             font-family: 'Share Tech Mono', monospace;
-            background-color: #303030; /* Dark red background */
+            background-color: #303030; /* Dark gray background */
             color: #ef4444; /* Bright red text */
             text-shadow: 0 0 5px #ef4444;
             white-space: pre;
@@ -110,6 +110,11 @@
         .ref-row:hover { background: #eff6ff; }
         kbd { background: #e5e7eb; border: 1px solid #9ca3af; border-radius: 3px; padding: 0 4px; font-size: 11px; }
 
+        body { padding-top: 44px; }
+        .menu-top { padding: 3px 14px; font-weight: 600; cursor: pointer; }
+        .menu-top:hover, .menu-top.open { background: #d1d5db; }
+        .menu-item { display: block; width: 100%; text-align: left; padding: 9px 14px; font-size: .8rem; cursor: pointer; }
+        .menu-item:hover { background: #dbeafe; }
         body.basic .adv-only { display: none !important; }
         body:not(.basic) .basic-only { display: none !important; }
         body.basic #app-container { max-width: 1240px; }
@@ -122,6 +127,26 @@
     </style>
 </head>
 <body class="basic flex flex-col items-center justify-center min-h-screen gap-2">
+
+    <!-- ================= MENU BAR (available in both modes) ================= -->
+    <div id="menubar" class="fixed top-0 left-0 right-0 z-40 bg-gray-100 border-b border-gray-400 text-sm flex items-center px-2 h-9 select-none">
+        <div class="relative">
+            <button id="file-btn" class="menu-top" onclick="toggleMenu(event)">File ▾</button>
+            <div id="file-menu" class="hidden absolute left-0 top-full bg-white border border-gray-400 shadow-lg w-72 py-1 z-50">
+                <button class="menu-item" onclick="menuDo('save')">Save program (.asm)…</button>
+                <button class="menu-item" onclick="menuDo('load')">Open program (.asm)…</button>
+                <button class="menu-item" onclick="menuDo('export')">Export image</button>
+                <div class="border-t border-gray-300 my-1"></div>
+                <button class="menu-item" onclick="menuDo('savestate')">Save machine state</button>
+                <button class="menu-item" onclick="menuDo('loadstate')">Load machine state</button>
+                <button class="menu-item" onclick="menuDo('new')">New (clear memory &amp; registers)</button>
+                <div class="border-t border-gray-300 my-1"></div>
+                <div id="storage-label" class="px-3 py-1 text-xs text-gray-500">Storage: checking…</div>
+            </div>
+        </div>
+        <span class="ml-auto text-xs text-gray-500">8085 Microprocessor Simulator</span>
+        <input type="file" id="file-asm" accept=".asm,.txt,.s,text/*" class="hidden">
+    </div>
 
     <div id="app-container" class="bg-gray-200 w-full max-w-[1500px] p-4 flex flex-col lg:flex-row gap-4 border border-gray-400 shadow-xl">
 
@@ -292,16 +317,7 @@
                         <option value="4">Max</option>
                     </select>
                 </label>
-                <span class="ml-auto"></span>
-                <button class="tb-btn" onclick="downloadAsm()" title="Download source as .asm">Save .asm</button>
-                <button class="tb-btn" onclick="document.getElementById('file-asm').click()">Open .asm</button>
-                <input type="file" id="file-asm" accept=".asm,.txt,.s,text/plain" class="hidden">
-            </div>
-            <div class="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-500 -mt-1">
-                <span id="storage-label">Storage: checking…</span>
-                <button onclick="saveState()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1 px-3 rounded shadow">Save State</button>
-                <button onclick="loadState()" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded shadow">Load State</button>
-            </div>
+                </div>
 
             <!-- Editor -->
             <div class="editor-wrap">
@@ -466,11 +482,12 @@
                 </tbody>
             </table>
             <div class="text-xs text-gray-500 leading-snug mt-1"><b>To enter a program:</b> Exam Mem → type address → Next → type a byte → Next … Then Reset, Go → address → Exec.</div>
+	<div class="text-xs text-gray-500 leading-snug mt-1"><b>press Ctrl minus to fit on screen</b></div>
+
             <footer class="text-sm text-gray-300 py-1 text-center">Made by <b>Abhinav Dharmesh</b></footer>
         </div>
     </div>
 
-    
 
     <!-- Custom Modal for Alerts (Instead of standard browser alert()) -->
     <div id="custom-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -478,6 +495,49 @@
             <h3 class="text-lg font-bold mb-2">Notification</h3>
             <p id="custom-modal-msg" class="text-sm text-gray-700 mb-4"></p>
             <button onclick="closeModal()" class="w-full bg-blue-600 text-white font-bold py-2 rounded">OK</button>
+        </div>
+    </div>
+
+    <!-- Save program dialog -->
+    <div id="save-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3">
+        <div class="bg-white p-5 rounded shadow-xl w-full max-w-sm">
+            <h3 class="text-lg font-bold mb-3">Save program</h3>
+            <label class="text-xs font-bold text-gray-600" for="save-name">File name</label>
+            <div class="flex items-center gap-1 mb-3">
+                <input id="save-name" class="flex-1 border border-gray-400 px-2 py-1 text-sm" maxlength="60" placeholder="e.g. subtraction" onkeydown="if(event.key==='Enter')doSave()">
+                <span class="text-sm text-gray-500">.asm</span>
+            </div>
+            <div id="save-src" class="hidden mb-3 text-xs flex flex-col gap-1">
+                <label class="flex items-start gap-2"><input type="radio" name="save-kind" value="mem" checked> <span>Program in memory (the debug table). Opens in Basic and Advanced.</span></label>
+                <label class="flex items-start gap-2"><input type="radio" name="save-kind" value="src"> <span>Editor source text (keeps labels and comments).</span></label>
+            </div>
+            <div class="flex gap-2">
+                <button class="flex-1 border border-gray-400 py-2 rounded font-bold text-sm" onclick="closeSave()">Cancel</button>
+                <button class="flex-1 bg-blue-600 text-white font-bold py-2 rounded text-sm" onclick="doSave()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export image dialog -->
+    <div id="export-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
+        <div class="bg-white rounded shadow-xl w-full max-w-4xl max-h-full overflow-y-auto p-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold">Export imagek</h3>
+                <button onclick="closeExport()" class="text-2xl leading-none px-2" aria-label="Close">&times;</button>
+            </div>
+            <p class="text-xs text-gray-600">A4 landscape PNG (2970 × 2100). It captures what the Basic screen shows right now: ADDRESS and DATA displays, registers, flags, stack and the full instruction table. A long table flows into extra columns.</p>
+            <div class="grid sm:grid-cols-2 gap-2 text-xs">
+                <label class="flex flex-col gap-1 font-bold text-gray-600">Heading on the page (optional)
+                    <input id="exp-title" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="80" placeholder="e.g. Experiment 3: 8-bit subtraction" oninput="exportSoon()"></label>
+                <label class="flex flex-col gap-1 font-bold text-gray-600">File name
+                    <input id="exp-name" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="60" placeholder="8085-state" value="8085-state"></label>
+            </div>
+            <div id="exp-preview" class="flex flex-col gap-2 border border-gray-300 bg-gray-100 p-2"></div>
+            <div class="flex flex-wrap gap-2 justify-end">
+                <button id="exp-share" class="hidden border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="exportShare()">Share…</button>
+                <button class="border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="closeExport()">Close</button>
+                <button class="bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm" onclick="exportDownload()">Download PNG</button>
+            </div>
         </div>
     </div>
 
@@ -1578,7 +1638,7 @@ WAIT:   HLT             ; sleep until an interrupt
         if (d.e.imm === 'd8') ops.push('8 bit'); else if (d.e.imm) ops.push('16 bit');
         return d.e.mn + (ops.length ? ' ' + ops.join(',') : '');
     }
-    function renderBasic() {
+    function basicRows() {
         const sorted = Array.from(touched).sort((x, y) => x - y), rows = [];
         let i = 0;
         while (i < sorted.length && rows.length < 3000) {
@@ -1586,6 +1646,10 @@ WAIT:   HLT             ; sleep until an interrupt
             for (let k = 0; k < d.len && a + k < 65536; k++) rows.push({ a: a + k, v: cpu.mem[a + k], t: k === 0 ? basicText(d) : '', n: k === 0 && d.e ? d.len : '' });
             const next = a + d.len; while (i < sorted.length && sorted[i] < next) i++;
         }
+        return rows;
+    }
+    function renderBasic() {
+        const rows = basicRows();
         const cur = kit.mode === 'memData' ? kit.memAddr : cpu.pc, td = 'class="border border-gray-300"';
         let h = '';
         for (const r of rows) h += `<tr data-a="${r.a}" class="${r.a === cur ? 'bcur' : ''}"><td>${hex4(r.a)}</td><td>${hex2(r.v)}</td><td>${escapeHtml(r.t)}</td><td>${r.n}</td></tr>`;
@@ -1675,9 +1739,240 @@ WAIT:   HLT             ; sleep until an interrupt
             deserialize(json); updateUI(); showModal('State loaded: registers, memory, program and breakpoints restored.');
         } catch (e) { showModal('Error loading: ' + e.message); }
     }
-    function downloadAsm() {
-        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('editor').value], { type: 'text/plain' }));
-        a.download = 'program.asm'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    // ---------- File menu: save / open program, export image ----------
+    function toggleMenu(e) { e.stopPropagation(); $('file-menu').classList.toggle('hidden'); }
+    function menuDo(w) {
+        $('file-menu').classList.add('hidden');
+        if (w === 'save') openSave();
+        else if (w === 'load') $('file-asm').click();
+        else if (w === 'export') openExport();
+        else if (w === 'savestate') saveState();
+        else if (w === 'loadstate') loadState();
+        else if (w === 'new') newAll();
+    }
+    function anyModalOpen() { return ['custom-modal', 'save-modal', 'export-modal'].some(id => !$(id).classList.contains('hidden')); }
+    function closeAllModals() { closeModal(); closeSave(); closeExport(); }
+    function cleanName(s, fallback) {
+        s = (s || '').replace(/[\\\/:*?"<>|\x00-\x1f]/g, '').replace(/\.(asm|png|txt)$/i, '').trim().replace(/\s+/g, '_');
+        return (s || fallback).slice(0, 60);
+    }
+    function downloadBlob(blob, name) {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    }
+
+    // Program in memory -> assembler source (one DB line per instruction, with the disassembly as a comment)
+    function memToAsm(name) {
+        const sorted = Array.from(touched).sort((x, y) => x - y);
+        const out = ['; ' + name + ' - saved from the 8085 Microprocessor Simulator (' + new Date().toLocaleString() + ')',
+                     '; Each DB line is one instruction. Open it again with File > Open program.', ''];
+        let i = 0, expect = -1;
+        while (i < sorted.length) {
+            const a = sorted[i], d = disasm(a);
+            if (a !== expect) out.push('        ORG ' + fmtH(a, 4));
+            const bytes = []; for (let k = 0; k < d.len && a + k < 65536; k++) bytes.push(fmtH(cpu.mem[a + k], 2));
+            out.push(('        DB ' + bytes.join(',')).padEnd(32) + '; ' + hex4(a) + '  ' + (d.e ? d.text : 'data'));
+            expect = a + d.len; while (i < sorted.length && sorted[i] < expect) i++;
+        }
+        return out.join('\n') + '\n';
+    }
+
+    let lastSaveName = 'program';
+    function openSave() {
+        const hasSrc = $('editor').value.trim() !== '';
+        $('save-src').classList.toggle('hidden', !hasSrc);
+        document.querySelector('input[name="save-kind"][value="' + (hasSrc && !basic ? 'src' : 'mem') + '"]').checked = true;
+        $('save-name').value = lastSaveName;
+        $('save-modal').classList.remove('hidden');
+        setTimeout(() => { $('save-name').focus(); $('save-name').select(); }, 30);
+    }
+    function closeSave() { $('save-modal').classList.add('hidden'); }
+    function doSave() {
+        const name = cleanName($('save-name').value, 'program');
+        const useSrc = !$('save-src').classList.contains('hidden') && document.querySelector('input[name="save-kind"]:checked').value === 'src';
+        let text;
+        if (useSrc) text = $('editor').value.replace(/\s*$/, '\n');
+        else {
+            if (!touched.size) { closeSave(); showModal('Nothing to save yet. Enter a program first (Exam Mem, type an address, Next, then the bytes).'); return; }
+            text = memToAsm(name);
+        }
+        downloadBlob(new Blob([text], { type: 'text/plain' }), name + '.asm');
+        lastSaveName = name; closeSave(); setMsg('Saved ' + name + '.asm');
+    }
+    function loadProgramText(text, fname) {
+        stopRun();
+        const res = assemble(text);
+        if (!res.ok) { showModal('Could not open "' + fname + '": ' + res.errors.slice(0, 3).map(e => 'line ' + (e.line + 1) + ': ' + e.msg).join('  |  ')); return; }
+        if (!res.count) { showModal('"' + fname + '" contains no program bytes.'); return; }
+        $('editor').value = text; onEditorInput(); assembleAndLoad();
+        lastSaveName = cleanName(fname, 'program');
+        setMsg('Opened ' + fname + ' (' + res.count + ' bytes at ' + hex4(res.lo) + 'H)');
+    }
+
+    // ---------- Export image (A4 landscape, drawn on a canvas so it looks the same on every device) ----------
+    let exportBlobs = [], exportUrls = [], exportToken = 0, exportTimer = null;
+    function stackList() {
+        const out = []; let a = cpu.sp, n = 0;
+        if (cpu.stackW.size) {
+            while (cpu.stackW.has(a) && n++ < 64) { out.push([hex4(a), hex2(cpu.mem[a])]); a = (a + 1) & 0xFFFF; }
+            out.push([hex4(a), 'XX']);
+        }
+        return out;
+    }
+    function fitPx(g, str, maxW, px, family, weight) {
+        g.font = (weight ? weight + ' ' : '') + px + 'px ' + family;
+        const w = g.measureText(str).width;
+        return w > maxW ? Math.max(8, Math.floor(px * maxW / w)) : px;
+    }
+    function roundRectPath(g, x, y, w, h, r) {
+        g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+    }
+    function buildExportCanvases(title) {
+        const W = 2970, H = 2100, M = 70, T = 215, Bt = H - 110;
+        const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
+        const MONO = "ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace";
+        const SEG = "'Share Tech Mono', " + MONO;
+        const rows = basicRows(), cur = kit.mode === 'memData' ? kit.memAddr : cpu.pc;
+        const addrTxt = $('display-address').textContent, dataTxt = $('display-data').textContent;
+        const regLines = $('reg-text').textContent.split('\n'), stack = stackList();
+        const now = new Date();
+        const stamp = now.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) + '  ' + now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+        // how many columns / what row height does the instruction table need?
+        const availH = Bt - T, headerH = 64, R = rows.length;
+        let n = 6, rh = 30, paged = true;
+        for (let k = 1; k <= 6; k++) {
+            const per = Math.max(Math.ceil(R / k), 12), h = Math.floor((availH - headerH) / per);
+            if (h >= 44) { n = k; rh = Math.min(h, 64); paged = false; break; }
+        }
+        const perCol = paged ? Math.floor((availH - headerH) / rh) : Math.max(Math.ceil(R / n), 12);
+        const pageCap = n * perCol, pages = Math.max(1, Math.ceil(R / pageCap));
+
+        const out = [];
+        for (let p = 0; p < pages; p++) {
+            const c = document.createElement('canvas'); c.width = W; c.height = H;
+            const g = c.getContext('2d');
+            g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle';
+            const tx = (s, x, y, font, color, align) => { g.font = font; g.fillStyle = color; g.textAlign = align || 'left'; g.fillText(s, x, y); };
+
+            // header
+            const tpx = fitPx(g, title || '8085 Microprocessor Simulator', W - 2 * M - 320, 58, SANS, 'bold');
+            tx(title || '8085 Microprocessor Simulator', M, 95, 'bold ' + tpx + 'px ' + SANS, '#111');
+            tx((title ? '8085 Microprocessor Simulator   •   ' : '') + 'Exported ' + stamp, M, 150, '30px ' + SANS, '#555');
+            if (pages > 1) tx('Page ' + (p + 1) + ' of ' + pages, W - M, 95, 'bold 36px ' + SANS, '#111', 'right');
+            g.fillStyle = '#222'; g.fillRect(M, 178, W - 2 * M, 4);
+            g.lineWidth = 2; g.strokeStyle = '#6b7280';
+
+            // ---- left column: displays, registers, flags, stack ----
+            const LX = M, LW = 900;
+            const lcd = (x, w, txt, len, label) => {
+                g.fillStyle = '#303030'; roundRectPath(g, x, T, w, 170, 16); g.fill();
+                g.save(); g.shadowColor = '#ef4444'; g.shadowBlur = 18;
+                const pitch = (w - 60) / len, s = String(txt).slice(0, len);
+                for (let i = 0; i < s.length; i++) if (s[i] !== ' ') tx(s[i], x + 30 + pitch * (i + 0.5), T + 90, '120px ' + SEG, '#ef4444', 'center');
+                g.restore();
+                tx(label, x + w / 2, T + 208, 'bold 30px ' + SANS, '#555', 'center');
+            };
+            lcd(LX, 560, addrTxt, 4, 'ADDRESS'); lcd(LX + 600, 300, dataTxt, 2, 'DATA');
+
+            let y = T + 170 + 38 + 60;
+            tx('REGISTERS', LX, y, 'bold 28px ' + SANS, '#555'); y += 50;
+            const rfs = Math.min(40, ...regLines.map(l => fitPx(g, l, LW, 40, MONO)));
+            regLines.forEach((l, i) => tx(l, LX, y + i * 52, rfs + 'px ' + MONO, '#111'));
+            y += regLines.length * 52 + 30;
+
+            const fl = [['S', cpu.S], ['Z', cpu.Z], ['', 'X'], ['AC', cpu.AC], ['', 'X'], ['P', cpu.P], ['', 'X'], ['CY', cpu.CY]], cw = LW / 8;
+            fl.forEach((f, i) => {
+                const x = LX + i * cw;
+                g.fillStyle = '#e5e7eb'; g.fillRect(x, y, cw, 52);
+                g.strokeRect(x, y, cw, 52); g.strokeRect(x, y + 52, cw, 52);
+                tx(f[0], x + cw / 2, y + 27, 'bold 30px ' + MONO, '#111', 'center');
+                tx(String(f[1]), x + cw / 2, y + 80, (f[1] === 1 ? 'bold ' : '') + '34px ' + MONO, f[1] === 'X' ? '#9ca3af' : '#111', 'center');
+            });
+            y += 104 + 60;
+
+            g.fillStyle = '#e5e7eb'; g.fillRect(LX, y, LW, 46); g.strokeRect(LX, y, LW, 46);
+            tx('STACK (LIFO)', LX + LW / 2, y + 24, 'bold 28px ' + SANS, '#444', 'center'); y += 46;
+            ['ADDRESS', 'DATA'].forEach((h, i) => { const x = LX + i * LW / 2; g.strokeRect(x, y, LW / 2, 44); tx(h, x + LW / 4, y + 23, 'bold 26px ' + SANS, '#991b1b', 'center'); });
+            y += 44;
+            const maxS = 12, sl = stack.slice(0, maxS), srows = Math.max(4, sl.length + (stack.length > maxS ? 1 : 0));
+            for (let i = 0; i < srows; i++) for (let j = 0; j < 2; j++) {
+                const x = LX + j * LW / 2; g.strokeRect(x, y + i * 44, LW / 2, 44);
+                const v = i < sl.length ? sl[i][j] : (i === sl.length && stack.length > maxS ? '…' : '');
+                if (v) tx(v, x + LW / 4, y + i * 44 + 23, '32px ' + MONO, (j === 0 && i === 0) ? '#991b1b' : '#111', 'center');
+            }
+
+            // ---- right: instruction table (n columns, flows left to right) ----
+            const TX = LX + LW + 60, TW = W - M - TX, colGap = 28;
+            const colW0 = (TW - (n - 1) * colGap) / n, colW = n === 1 ? Math.min(colW0, 1500) : colW0;
+            const ratios = [0.22, 0.19, 0.43, 0.16];
+            const chunk = rows.slice(p * pageCap, (p + 1) * pageCap);
+            const fs = Math.min(rh * 0.52, fitPx(g, '0000', colW * ratios[0] - 16, 100, MONO), fitPx(g, 'LXI SP,16 bit', colW * ratios[2] - 16, 100, MONO));
+            const hs = Math.min(30, fitPx(g, 'ADDRESS', colW * ratios[0] - 12, 60, SANS, 'bold'), fitPx(g, 'OPCODE', colW * ratios[1] - 12, 60, SANS, 'bold'),
+                                fitPx(g, 'INSTRUCTION', colW * ratios[2] - 12, 60, SANS, 'bold'), fitPx(g, 'BYTES', colW * ratios[3] - 12, 60, SANS, 'bold'));
+            for (let k = 0; k < n; k++) {
+                const x0 = TX + k * (colW + colGap), xs = [x0];
+                for (let q = 0; q < 4; q++) xs.push(xs[q] + colW * ratios[q]);
+                g.fillStyle = '#e5e7eb'; g.fillRect(x0, T, colW, headerH);
+                ['ADDRESS', 'OPCODE', 'INSTRUCTION', 'BYTES'].forEach((h, q) => {
+                    g.strokeRect(xs[q], T, xs[q + 1] - xs[q], headerH);
+                    tx(h, q === 2 ? xs[q] + 14 : (xs[q] + xs[q + 1]) / 2, T + headerH / 2 + 1, 'bold ' + hs + 'px ' + SANS, '#111', q === 2 ? 'left' : 'center');
+                });
+                for (let r = 0; r < perCol; r++) {
+                    const row = chunk[k * perCol + r], y0 = T + headerH + r * rh, isCur = !!row && row.a === cur;
+                    if (isCur) { g.fillStyle = '#dbeafe'; g.fillRect(x0, y0, colW, rh); }
+                    for (let q = 0; q < 4; q++) g.strokeRect(xs[q], y0, xs[q + 1] - xs[q], rh);
+                    if (!row) continue;
+                    const f = (isCur ? 'bold ' : '') + Math.floor(fs) + 'px ' + MONO, col = isCur ? '#1d4ed8' : '#111', ym = y0 + rh / 2 + 1;
+                    tx(hex4(row.a), (xs[0] + xs[1]) / 2, ym, f, col, 'center');
+                    tx(hex2(row.v), (xs[1] + xs[2]) / 2, ym, f, col, 'center');
+                    if (row.t) tx(row.t, xs[2] + 14, ym, f, col, 'left');
+                    if (row.n !== '') tx(String(row.n), (xs[3] + xs[4]) / 2, ym, f, col, 'center');
+                }
+            }
+
+            // footer
+            g.fillStyle = '#bbb'; g.fillRect(M, H - 80, W - 2 * M, 2);
+            if (rows.some(r => r.a === cur)) tx('Shaded row = current PC / address shown on the ADDRESS display', W - M, H - 45, '26px ' + SANS, '#777', 'right');
+            out.push(c);
+        }
+        return out;
+    }
+    function openExport() {
+        $('export-modal').classList.remove('hidden');
+        renderExport();
+    }
+    function closeExport() {
+        exportToken++; $('export-modal').classList.add('hidden');
+        exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = []; $('exp-preview').innerHTML = '';
+    }
+    function exportSoon() { clearTimeout(exportTimer); exportTimer = setTimeout(renderExport, 300); }
+    async function renderExport() {
+        const tok = ++exportToken;
+        $('exp-preview').innerHTML = '<div class="text-xs text-gray-500 p-4">Rendering…</div>';
+        try { if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('100px "Share Tech Mono"'), new Promise(r => setTimeout(r, 900))]); } catch (e) {}
+        if (tok !== exportToken) return;
+        const canvases = buildExportCanvases($('exp-title').value.trim());
+        const blobs = await Promise.all(canvases.map(c => new Promise(res => c.toBlob(res, 'image/png'))));
+        if (tok !== exportToken) return;
+        exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = blobs;
+        const box = $('exp-preview'); box.innerHTML = '';
+        blobs.forEach((b, i) => {
+            const u = URL.createObjectURL(b); exportUrls.push(u);
+            const im = document.createElement('img'); im.src = u; im.alt = 'Export preview, page ' + (i + 1); im.className = 'w-full border border-gray-400 bg-white'; box.appendChild(im);
+        });
+        let canShare = false; try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blobs[0]], 'x.png', { type: 'image/png' })] })); } catch (e) {}
+        $('exp-share').classList.toggle('hidden', !canShare);
+    }
+    function exportFileName(i) { const base = cleanName($('exp-name').value, '8085-state'); return base + (exportBlobs.length > 1 ? '-' + (i + 1) : '') + '.png'; }
+    function exportDownload() {
+        if (!exportBlobs.length) return;
+        exportBlobs.forEach((b, i) => setTimeout(() => downloadBlob(b, exportFileName(i)), i * 400));
+    }
+    async function exportShare() {
+        try { await navigator.share({ files: exportBlobs.map((b, i) => new File([b], exportFileName(i), { type: 'image/png' })), title: cleanName($('exp-name').value, '8085-state') }); } catch (e) {}
     }
 
     // ---------- Init & events ----------
@@ -1714,9 +2009,11 @@ WAIT:   HLT             ; sleep until an interrupt
         $('ref-search').addEventListener('input', renderRef);
         $('file-asm').addEventListener('change', e => {
             const f = e.target.files[0]; if (!f) return;
-            const rd = new FileReader(); rd.onload = () => { $('editor').value = rd.result; onEditorInput(); assembleAndLoad(); }; rd.readAsText(f); e.target.value = '';
+            const reader = new FileReader(); reader.onload = () => loadProgramText(String(reader.result), f.name); reader.readAsText(f); e.target.value = '';
         });
+        document.addEventListener('click', () => $('file-menu').classList.add('hidden'));
         document.addEventListener('keydown', e => {
+            if (anyModalOpen()) { if (e.key === 'Escape') closeAllModals(); return; }
             const t = e.target.tagName; if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') { if (e.key === 'Escape') e.target.blur(); return; }
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             if (/^[0-9a-fA-F]$/.test(e.key)) { flashKey(e.key.toUpperCase()); handleHexInput(e.key.toUpperCase()); }

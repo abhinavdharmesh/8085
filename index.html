@@ -482,8 +482,6 @@
                 </tbody>
             </table>
             <div class="text-xs text-gray-500 leading-snug mt-1"><b>To enter a program:</b> Exam Mem → type address → Next → type a byte → Next … Then Reset, Go → address → Exec.</div>
-	<div class="text-xs text-gray-500 leading-snug mt-1"><b>press Ctrl minus to fit on screen</b></div>
-
             <footer class="text-sm text-gray-300 py-1 text-center">Made by <b>Abhinav Dharmesh</b></footer>
         </div>
     </div>
@@ -522,11 +520,15 @@
     <div id="export-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
         <div class="bg-white rounded shadow-xl w-full max-w-4xl max-h-full overflow-y-auto p-4 flex flex-col gap-3">
             <div class="flex items-center justify-between">
-                <h3 class="text-lg font-bold">Export imagek</h3>
+                <h3 class="text-lg font-bold">Export image</h3>
                 <button onclick="closeExport()" class="text-2xl leading-none px-2" aria-label="Close">&times;</button>
             </div>
-            <p class="text-xs text-gray-600">A4 landscape PNG (2970 × 2100). It captures what the Basic screen shows right now: ADDRESS and DATA displays, registers, flags, stack and the full instruction table. A long table flows into extra columns.</p>
+            <p class="text-xs text-gray-600">A4 landscape, as PNG or PDF. It captures what the Basic screen shows right now: ADDRESS and DATA displays, registers, flags, stack and the full instruction table. A long table flows into extra columns.</p>
             <div class="grid sm:grid-cols-2 gap-2 text-xs">
+                <label class="flex flex-col gap-1 font-bold text-gray-600">Student name
+                    <input id="exp-student" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="60" placeholder="Your name (remembered on this device)" autocomplete="name" oninput="exportInput()"></label>
+                <label class="flex flex-col gap-1 font-bold text-gray-600">Roll number (optional)
+                    <input id="exp-roll" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="30" placeholder="Leave empty to hide" oninput="exportInput()"></label>
                 <label class="flex flex-col gap-1 font-bold text-gray-600">Heading on the page (optional)
                     <input id="exp-title" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="80" placeholder="e.g. Experiment 3: 8-bit subtraction" oninput="exportSoon()"></label>
                 <label class="flex flex-col gap-1 font-bold text-gray-600">File name
@@ -536,7 +538,8 @@
             <div class="flex flex-wrap gap-2 justify-end">
                 <button id="exp-share" class="hidden border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="exportShare()">Share…</button>
                 <button class="border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="closeExport()">Close</button>
-                <button class="bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm" onclick="exportDownload()">Download PNG</button>
+                <button class="border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="exportDownload()">Download PNG</button>
+                <button class="bg-blue-600 text-white font-bold py-2 px-4 rounded text-sm" onclick="exportPdf()">Download PDF</button>
             </div>
         </div>
     </div>
@@ -1719,7 +1722,7 @@ WAIT:   HLT             ; sleep until an interrupt
         [cpu.m55, cpu.m65, cpu.m75] = s.m; [cpu.p55, cpu.p65, cpu.p75] = s.p; cpu.sid = s.sid; cpu.sod = s.sod;
         cpu.halted = !!s.halted; cpu.tstates = s.t; cpu.icount = s.n; cpu.ioIn.set(s.ioIn); cpu.ioOut.set(s.ioOut); cpu.outUsed = new Set(s.outUsed);
         cpu.trap = 0; cpu.intr = -1;
-        $('editor').value = s.src; breakpoints = new Set(s.bps); progStart = s.start;
+        $('editor').value = s.src; breakpoints = new Set(s.bps || []); progStart = s.start;
         const res = assemble(s.src); lineOfAddr = res.lineOfAddr; addrOfLine = res.addrOfLine; errLines = new Set(); dirty = false;
         trace = []; kit.mode = 'step'; listBase = cpu.pc; follow = true; $('list-follow').checked = true; prevRegs = {};
     }
@@ -1811,7 +1814,7 @@ WAIT:   HLT             ; sleep until an interrupt
     }
 
     // ---------- Export image (A4 landscape, drawn on a canvas so it looks the same on every device) ----------
-    let exportBlobs = [], exportUrls = [], exportToken = 0, exportTimer = null;
+    let exportBlobs = [], exportCanvases = [], exportUrls = [], exportToken = 0, exportTimer = null;
     function stackList() {
         const out = []; let a = cpu.sp, n = 0;
         if (cpu.stackW.size) {
@@ -1829,84 +1832,105 @@ WAIT:   HLT             ; sleep until an interrupt
         g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
         g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
     }
-    function buildExportCanvases(title) {
-        const W = 2970, H = 2100, M = 70, T = 215, Bt = H - 110;
+    function buildExportCanvases(opt) {
+        const W = 2970, H = 2100, M = 70, T = 215, Bt = H - 110, PAD = 30, TITLEH = 64, GAP = 50, headerH = 64;
         const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
         const MONO = "ui-monospace, Menlo, Consolas, 'DejaVu Sans Mono', 'Courier New', monospace";
         const SEG = "'Share Tech Mono', " + MONO;
         const rows = basicRows(), cur = kit.mode === 'memData' ? kit.memAddr : cpu.pc;
         const addrTxt = $('display-address').textContent, dataTxt = $('display-data').textContent;
         const regLines = $('reg-text').textContent.split('\n'), stack = stackList();
+        const title = (opt.title || '').trim(), nm = (opt.name || '').trim(), rl = (opt.roll || '').trim();
         const now = new Date();
         const stamp = now.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) + '  ' + now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
-        // how many columns / what row height does the instruction table need?
-        const availH = Bt - T, headerH = 64, R = rows.length;
-        let n = 6, rh = 30, paged = true;
-        for (let k = 1; k <= 6; k++) {
-            const per = Math.max(Math.ceil(R / k), 12), h = Math.floor((availH - headerH) / per);
-            if (h >= 44) { n = k; rh = Math.min(h, 64); paged = false; break; }
-        }
-        const perCol = paged ? Math.floor((availH - headerH) / rh) : Math.max(Math.ceil(R / n), 12);
+        // ---- automatic layout: both panels span the same height; the table adds columns / pages as needed ----
+        const innerTop = T + TITLEH + PAD, innerH = (Bt - T) - TITLEH - 2 * PAD, tableAvail = innerH - headerH, R = rows.length;
+        let n = 6, paged = true;
+        for (let k = 1; k <= 6; k++) { const per = Math.ceil(R / k); if (!per || tableAvail / per >= 44) { n = k; paged = false; break; } }
+        let perCol, rh;
+        if (paged) { rh = 30; perCol = Math.floor(tableAvail / rh); }
+        else { perCol = Math.max(Math.ceil(R / n), Math.floor(tableAvail / 62)); rh = tableAvail / perCol; }
         const pageCap = n * perCol, pages = Math.max(1, Math.ceil(R / pageCap));
+        const leftW = n === 1 ? (W - 2 * M - GAP) / 2 : 960, rightX = M + leftW + GAP, rightW = W - M - rightX;
+
+        // machine-state column: sections are scaled to the panel and spread evenly top to bottom
+        const srowsN = Math.max(4, Math.min(stack.length, 12) + (stack.length > 12 ? 1 : 0));
+        const hLcd = 230, hReg = 205, hFlag = 104, hStack = 46 + 44 + srowsN * 44, total1 = hLcd + hReg + hFlag + hStack;
+        const LWin = leftW - 2 * PAD;
+        const sc = Math.min(LWin / 900, (innerH - 3 * 40) / total1, 1.6);
+        const gap = Math.min((innerH - sc * total1) / 3 / sc, 110);
+        const yStart = innerTop + (innerH - sc * (total1 + 3 * gap)) / 2, xStart = M + PAD + (LWin - 900 * sc) / 2;
 
         const out = [];
         for (let p = 0; p < pages; p++) {
             const c = document.createElement('canvas'); c.width = W; c.height = H;
             const g = c.getContext('2d');
             g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.textBaseline = 'middle';
-            const tx = (s, x, y, font, color, align) => { g.font = font; g.fillStyle = color; g.textAlign = align || 'left'; g.fillText(s, x, y); };
+            const tx = (s, x, y, font, color, align) => { g.font = font; g.fillStyle = color; g.textAlign = align || 'left'; g.fillText(s, x, y); return g.measureText(s).width; };
 
-            // header
-            const tpx = fitPx(g, title || '8085 Microprocessor Simulator', W - 2 * M - 320, 58, SANS, 'bold');
-            tx(title || '8085 Microprocessor Simulator', M, 95, 'bold ' + tpx + 'px ' + SANS, '#111');
-            tx((title ? '8085 Microprocessor Simulator   •   ' : '') + 'Exported ' + stamp, M, 150, '30px ' + SANS, '#555');
-            if (pages > 1) tx('Page ' + (p + 1) + ' of ' + pages, W - M, 95, 'bold 36px ' + SANS, '#111', 'right');
+            // ---- header: title on the left, student on the right ----
+            let blockW = 0;
+            if (nm) { const px = fitPx(g, 'Name: ' + nm, 1000, 46, SANS, 'bold'); blockW = Math.max(blockW, tx('Name: ' + nm, W - M, rl ? 70 : 95, 'bold ' + px + 'px ' + SANS, '#111', 'right')); }
+            if (rl) blockW = Math.max(blockW, tx('Roll No: ' + rl, W - M, nm ? 128 : 95, '38px ' + SANS, '#111', 'right'));
+            const heading = title || '8085 Microprocessor Simulator', tpx = fitPx(g, heading, W - 2 * M - blockW - 80, 58, SANS, 'bold');
+            tx(heading, M, 82, 'bold ' + tpx + 'px ' + SANS, '#111');
+            tx((title ? '8085 Microprocessor Simulator   •   ' : '') + 'Exported ' + stamp, M, 142, '30px ' + SANS, '#555');
             g.fillStyle = '#222'; g.fillRect(M, 178, W - 2 * M, 4);
-            g.lineWidth = 2; g.strokeStyle = '#6b7280';
 
-            // ---- left column: displays, registers, flags, stack ----
-            const LX = M, LW = 900;
-            const lcd = (x, w, txt, len, label) => {
-                g.fillStyle = '#303030'; roundRectPath(g, x, T, w, 170, 16); g.fill();
+            // ---- panel frames ----
+            const panel = (x, w, label) => {
+                g.save(); roundRectPath(g, x, T, w, Bt - T, 18); g.clip(); g.fillStyle = '#e5e7eb'; g.fillRect(x, T, w, TITLEH); g.restore();
+                g.lineWidth = 3; g.strokeStyle = '#4b5563'; roundRectPath(g, x, T, w, Bt - T, 18); g.stroke();
+                g.beginPath(); g.moveTo(x, T + TITLEH); g.lineTo(x + w, T + TITLEH); g.stroke();
+                tx(label, x + w / 2, T + TITLEH / 2 + 1, 'bold 32px ' + SANS, '#222', 'center');
+                g.lineWidth = 2; g.strokeStyle = '#6b7280';
+            };
+            panel(M, leftW, 'MACHINE STATE');
+            panel(rightX, rightW, 'INSTRUCTION TABLE' + (pages > 1 ? '  (page ' + (p + 1) + ' of ' + pages + ')' : ''));
+
+            // ---- left: displays, registers, flags, stack (drawn at 900-unit width, then scaled) ----
+            g.save(); g.translate(xStart, yStart); g.scale(sc, sc);
+            const lcd = (x, y0, w, txt, len, label) => {
+                g.fillStyle = '#303030'; roundRectPath(g, x, y0, w, 170, 16); g.fill();
                 g.save(); g.shadowColor = '#ef4444'; g.shadowBlur = 18;
                 const pitch = (w - 60) / len, s = String(txt).slice(0, len);
-                for (let i = 0; i < s.length; i++) if (s[i] !== ' ') tx(s[i], x + 30 + pitch * (i + 0.5), T + 90, '120px ' + SEG, '#ef4444', 'center');
+                for (let i = 0; i < s.length; i++) if (s[i] !== ' ') tx(s[i], x + 30 + pitch * (i + 0.5), y0 + 90, '120px ' + SEG, '#ef4444', 'center');
                 g.restore();
-                tx(label, x + w / 2, T + 208, 'bold 30px ' + SANS, '#555', 'center');
+                tx(label, x + w / 2, y0 + 208, 'bold 30px ' + SANS, '#555', 'center');
             };
-            lcd(LX, 560, addrTxt, 4, 'ADDRESS'); lcd(LX + 600, 300, dataTxt, 2, 'DATA');
+            let y = 0;
+            lcd(0, y, 560, addrTxt, 4, 'ADDRESS'); lcd(600, y, 300, dataTxt, 2, 'DATA'); y += hLcd + gap;
 
-            let y = T + 170 + 38 + 60;
-            tx('REGISTERS', LX, y, 'bold 28px ' + SANS, '#555'); y += 50;
-            const rfs = Math.min(40, ...regLines.map(l => fitPx(g, l, LW, 40, MONO)));
-            regLines.forEach((l, i) => tx(l, LX, y + i * 52, rfs + 'px ' + MONO, '#111'));
-            y += regLines.length * 52 + 30;
+            tx('REGISTERS', 0, y + 14, 'bold 28px ' + SANS, '#555');
+            const rfs = Math.min(40, ...regLines.map(l => fitPx(g, l, 900, 40, MONO)));
+            regLines.forEach((l, i) => tx(l, 0, y + 64 + i * 52, rfs + 'px ' + MONO, '#111'));
+            y += hReg + gap;
 
-            const fl = [['S', cpu.S], ['Z', cpu.Z], ['', 'X'], ['AC', cpu.AC], ['', 'X'], ['P', cpu.P], ['', 'X'], ['CY', cpu.CY]], cw = LW / 8;
+            const fl = [['S', cpu.S], ['Z', cpu.Z], ['', 'X'], ['AC', cpu.AC], ['', 'X'], ['P', cpu.P], ['', 'X'], ['CY', cpu.CY]], cw = 900 / 8;
             fl.forEach((f, i) => {
-                const x = LX + i * cw;
+                const x = i * cw;
                 g.fillStyle = '#e5e7eb'; g.fillRect(x, y, cw, 52);
                 g.strokeRect(x, y, cw, 52); g.strokeRect(x, y + 52, cw, 52);
                 tx(f[0], x + cw / 2, y + 27, 'bold 30px ' + MONO, '#111', 'center');
                 tx(String(f[1]), x + cw / 2, y + 80, (f[1] === 1 ? 'bold ' : '') + '34px ' + MONO, f[1] === 'X' ? '#9ca3af' : '#111', 'center');
             });
-            y += 104 + 60;
+            y += hFlag + gap;
 
-            g.fillStyle = '#e5e7eb'; g.fillRect(LX, y, LW, 46); g.strokeRect(LX, y, LW, 46);
-            tx('STACK (LIFO)', LX + LW / 2, y + 24, 'bold 28px ' + SANS, '#444', 'center'); y += 46;
-            ['ADDRESS', 'DATA'].forEach((h, i) => { const x = LX + i * LW / 2; g.strokeRect(x, y, LW / 2, 44); tx(h, x + LW / 4, y + 23, 'bold 26px ' + SANS, '#991b1b', 'center'); });
+            g.fillStyle = '#e5e7eb'; g.fillRect(0, y, 900, 46); g.strokeRect(0, y, 900, 46);
+            tx('STACK (LIFO)', 450, y + 24, 'bold 28px ' + SANS, '#444', 'center'); y += 46;
+            ['ADDRESS', 'DATA'].forEach((h, i) => { g.strokeRect(i * 450, y, 450, 44); tx(h, i * 450 + 225, y + 23, 'bold 26px ' + SANS, '#991b1b', 'center'); });
             y += 44;
-            const maxS = 12, sl = stack.slice(0, maxS), srows = Math.max(4, sl.length + (stack.length > maxS ? 1 : 0));
-            for (let i = 0; i < srows; i++) for (let j = 0; j < 2; j++) {
-                const x = LX + j * LW / 2; g.strokeRect(x, y + i * 44, LW / 2, 44);
-                const v = i < sl.length ? sl[i][j] : (i === sl.length && stack.length > maxS ? '…' : '');
-                if (v) tx(v, x + LW / 4, y + i * 44 + 23, '32px ' + MONO, (j === 0 && i === 0) ? '#991b1b' : '#111', 'center');
+            const sl = stack.slice(0, 12);
+            for (let i = 0; i < srowsN; i++) for (let j = 0; j < 2; j++) {
+                g.strokeRect(j * 450, y + i * 44, 450, 44);
+                const v = i < sl.length ? sl[i][j] : (i === sl.length && stack.length > 12 ? '…' : '');
+                if (v) tx(v, j * 450 + 225, y + i * 44 + 23, '32px ' + MONO, (j === 0 && i === 0) ? '#991b1b' : '#111', 'center');
             }
+            g.restore();
 
-            // ---- right: instruction table (n columns, flows left to right) ----
-            const TX = LX + LW + 60, TW = W - M - TX, colGap = 28;
-            const colW0 = (TW - (n - 1) * colGap) / n, colW = n === 1 ? Math.min(colW0, 1500) : colW0;
+            // ---- right: instruction table ----
+            const TX = rightX + PAD, innerW = rightW - 2 * PAD, colGap = 24, colW = (innerW - (n - 1) * colGap) / n;
             const ratios = [0.22, 0.19, 0.43, 0.16];
             const chunk = rows.slice(p * pageCap, (p + 1) * pageCap);
             const fs = Math.min(rh * 0.52, fitPx(g, '0000', colW * ratios[0] - 16, 100, MONO), fitPx(g, 'LXI SP,16 bit', colW * ratios[2] - 16, 100, MONO));
@@ -1915,17 +1939,17 @@ WAIT:   HLT             ; sleep until an interrupt
             for (let k = 0; k < n; k++) {
                 const x0 = TX + k * (colW + colGap), xs = [x0];
                 for (let q = 0; q < 4; q++) xs.push(xs[q] + colW * ratios[q]);
-                g.fillStyle = '#e5e7eb'; g.fillRect(x0, T, colW, headerH);
+                g.fillStyle = '#e5e7eb'; g.fillRect(x0, innerTop, colW, headerH);
                 ['ADDRESS', 'OPCODE', 'INSTRUCTION', 'BYTES'].forEach((h, q) => {
-                    g.strokeRect(xs[q], T, xs[q + 1] - xs[q], headerH);
-                    tx(h, q === 2 ? xs[q] + 14 : (xs[q] + xs[q + 1]) / 2, T + headerH / 2 + 1, 'bold ' + hs + 'px ' + SANS, '#111', q === 2 ? 'left' : 'center');
+                    g.strokeRect(xs[q], innerTop, xs[q + 1] - xs[q], headerH);
+                    tx(h, q === 2 ? xs[q] + 14 : (xs[q] + xs[q + 1]) / 2, innerTop + headerH / 2 + 1, 'bold ' + hs + 'px ' + SANS, '#111', q === 2 ? 'left' : 'center');
                 });
                 for (let r = 0; r < perCol; r++) {
-                    const row = chunk[k * perCol + r], y0 = T + headerH + r * rh, isCur = !!row && row.a === cur;
-                    if (isCur) { g.fillStyle = '#dbeafe'; g.fillRect(x0, y0, colW, rh); }
-                    for (let q = 0; q < 4; q++) g.strokeRect(xs[q], y0, xs[q + 1] - xs[q], rh);
+                    const row = chunk[k * perCol + r], ya = innerTop + headerH + Math.round(r * rh), yb = innerTop + headerH + Math.round((r + 1) * rh), hh = yb - ya, isCur = !!row && row.a === cur;
+                    if (isCur) { g.fillStyle = '#dbeafe'; g.fillRect(x0, ya, colW, hh); }
+                    for (let q = 0; q < 4; q++) g.strokeRect(xs[q], ya, xs[q + 1] - xs[q], hh);
                     if (!row) continue;
-                    const f = (isCur ? 'bold ' : '') + Math.floor(fs) + 'px ' + MONO, col = isCur ? '#1d4ed8' : '#111', ym = y0 + rh / 2 + 1;
+                    const f = (isCur ? 'bold ' : '') + Math.floor(fs) + 'px ' + MONO, col = isCur ? '#1d4ed8' : '#111', ym = ya + hh / 2 + 1;
                     tx(hex4(row.a), (xs[0] + xs[1]) / 2, ym, f, col, 'center');
                     tx(hex2(row.v), (xs[1] + xs[2]) / 2, ym, f, col, 'center');
                     if (row.t) tx(row.t, xs[2] + 14, ym, f, col, 'left');
@@ -1933,28 +1957,72 @@ WAIT:   HLT             ; sleep until an interrupt
                 }
             }
 
-            // footer
+            // ---- footer ----
             g.fillStyle = '#bbb'; g.fillRect(M, H - 80, W - 2 * M, 2);
+            if (pages > 1) tx('Page ' + (p + 1) + ' of ' + pages, M, H - 45, '26px ' + SANS, '#777');
             if (rows.some(r => r.a === cur)) tx('Shaded row = current PC / address shown on the ADDRESS display', W - M, H - 45, '26px ' + SANS, '#777', 'right');
             out.push(c);
         }
         return out;
     }
+
+    // Minimal PDF writer: one full-bleed A4-landscape JPEG per page (no external library needed)
+    function buildPdf(jpegs) {
+        const enc = new TextEncoder(), parts = [], offsets = []; let off = 0;
+        const push = x => { const b = typeof x === 'string' ? enc.encode(x) : x; parts.push(b); off += b.length; };
+        const obj = (id, fn) => { offsets[id] = off; push(id + ' 0 obj\n'); fn(); push('\nendobj\n'); };
+        const n = jpegs.length;
+        push('%PDF-1.4\n');
+        obj(1, () => push('<< /Type /Catalog /Pages 2 0 R >>'));
+        obj(2, () => push('<< /Type /Pages /Kids [' + jpegs.map((_, i) => (3 + 3 * i) + ' 0 R').join(' ') + '] /Count ' + n + ' >>'));
+        jpegs.forEach((j, i) => {
+            const pid = 3 + 3 * i, cid = pid + 1, iid = pid + 2, content = 'q 841.89 0 0 595.28 0 0 cm /Im0 Do Q';
+            obj(pid, () => push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /XObject << /Im0 ' + iid + ' 0 R >> >> /Contents ' + cid + ' 0 R >>'));
+            obj(cid, () => push('<< /Length ' + content.length + ' >>\nstream\n' + content + '\nendstream'));
+            obj(iid, () => { push('<< /Type /XObject /Subtype /Image /Width ' + j.w + ' /Height ' + j.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + j.bytes.length + ' >>\nstream\n'); push(j.bytes); push('\nendstream'); });
+        });
+        const total = 3 * n + 3, xref = off;
+        push('xref\n0 ' + total + '\n0000000000 65535 f \n');
+        for (let id = 1; id < total; id++) push(String(offsets[id]).padStart(10, '0') + ' 00000 n \n');
+        push('trailer\n<< /Size ' + total + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF');
+        return new Blob(parts, { type: 'application/pdf' });
+    }
+    async function exportPdf() {
+        if (!exportCanvases.length) return;
+        const jp = [];
+        for (const c of exportCanvases) {
+            const b = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.95));
+            jp.push({ bytes: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height });
+        }
+        downloadBlob(buildPdf(jp), cleanName($('exp-name').value, '8085-state') + '.pdf');
+    }
+
+    // student name / roll number are remembered in this browser
+    function loadStudent() {
+        try { const s = JSON.parse(localStorage.getItem('8085sim_student') || '{}'); $('exp-student').value = s.n || ''; $('exp-roll').value = s.r || ''; } catch (e) {}
+    }
+    function saveStudent() {
+        try { localStorage.setItem('8085sim_student', JSON.stringify({ n: $('exp-student').value.trim(), r: $('exp-roll').value.trim() })); } catch (e) {}
+    }
+    function exportInput() { saveStudent(); exportSoon(); }
+
     function openExport() {
+        loadStudent();
         $('export-modal').classList.remove('hidden');
         renderExport();
     }
     function closeExport() {
         exportToken++; $('export-modal').classList.add('hidden');
-        exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = []; $('exp-preview').innerHTML = '';
+        exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = []; exportCanvases = []; $('exp-preview').innerHTML = '';
     }
-    function exportSoon() { clearTimeout(exportTimer); exportTimer = setTimeout(renderExport, 300); }
+    function exportSoon() { clearTimeout(exportTimer); exportTimer = setTimeout(renderExport, 600); }
     async function renderExport() {
         const tok = ++exportToken;
         $('exp-preview').innerHTML = '<div class="text-xs text-gray-500 p-4">Rendering…</div>';
         try { if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('100px "Share Tech Mono"'), new Promise(r => setTimeout(r, 900))]); } catch (e) {}
         if (tok !== exportToken) return;
-        const canvases = buildExportCanvases($('exp-title').value.trim());
+        const canvases = buildExportCanvases({ title: $('exp-title').value, name: $('exp-student').value, roll: $('exp-roll').value });
+        exportCanvases = canvases;
         const blobs = await Promise.all(canvases.map(c => new Promise(res => c.toBlob(res, 'image/png'))));
         if (tok !== exportToken) return;
         exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = blobs;

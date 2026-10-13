@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>8085 Microprocessor Simulator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="application-name" content="8085 Microprocessor Simulator v2.5.0">
+    <!-- Optional nicer LED font: loaded without blocking the page; the app works fully offline without it. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" media="print" onload="this.media='all'">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
         body {
             font-family: 'Inter', system-ui, sans-serif;
@@ -111,6 +112,8 @@
         kbd { background: #e5e7eb; border: 1px solid #9ca3af; border-radius: 3px; padding: 0 4px; font-size: 11px; }
 
         body { padding-top: 44px; }
+        button, .key-btn, .tb-btn, .mode-btn, .menu-item, .menu-top, .tab-btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        @media (max-width: 1023px) { input, select, textarea { font-size: 16px !important; } body { padding-left: 6px; padding-right: 6px; } }
         .menu-top { padding: 3px 14px; font-weight: 600; cursor: pointer; }
         .menu-top:hover, .menu-top.open { background: #d1d5db; }
         .menu-item { display: block; width: 100%; text-align: left; padding: 9px 14px; font-size: .8rem; cursor: pointer; }
@@ -128,6 +131,192 @@
         #basic-body tr.bcur { color: #2563eb; font-weight: 700; }
         #basic-body tr.flash { background: #fef08a; }
     </style>
+    <style id="utilities">/*TWSTART*/
+/* --- base reset (Tailwind preflight equivalent) --- */
+*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid;border-color:#e5e7eb}
+html{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+body{margin:0;line-height:inherit}
+hr{height:0;color:inherit;border-top-width:1px}
+h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}
+a{color:inherit;text-decoration:inherit}
+b,strong{font-weight:bolder}
+code,kbd,samp,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;font-size:1em}
+small{font-size:80%}
+table{text-indent:0;border-color:inherit;border-collapse:collapse}
+button,input,optgroup,select,textarea{font-family:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}
+button,select{text-transform:none}
+button,[type=button],[type=submit]{-webkit-appearance:button;background-color:transparent;background-image:none}
+button,[role=button]{cursor:pointer}
+:-moz-focusring{outline:auto}
+progress{vertical-align:baseline}
+textarea{resize:vertical}
+input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}
+blockquote,dl,dd,h1,h2,h3,h4,h5,h6,hr,figure,p,pre{margin:0}
+fieldset{margin:0;padding:0}
+legend{padding:0}
+ol,ul,menu{list-style:none;margin:0;padding:0}
+img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}
+img,video{max-width:100%;height:auto}
+[hidden]{display:none}
+/* --- utilities used by this page --- */
+.absolute{position:absolute}
+.fixed{position:fixed}
+.relative{position:relative}
+.sticky{position:sticky}
+.inset-0{inset:0px}
+.left-0{left:0px}
+.right-0{right:0px}
+.top-0{top:0px}
+.top-\[30px\]{top:30px}
+.top-\[34px\]{top:34px}
+.top-full{top:100%}
+.z-10{z-index:10}
+.z-40{z-index:40}
+.z-50{z-index:50}
+.col-span-2{grid-column:span 2 / span 2}
+.-mx-4{margin-left:-1rem;margin-right:-1rem}
+.my-1{margin-top:0.25rem;margin-bottom:0.25rem}
+.-mt-4{margin-top:-1rem}
+.mt-1{margin-top:0.25rem}
+.mt-2{margin-top:0.5rem}
+.mt-auto{margin-top:auto}
+.mb-1{margin-bottom:0.25rem}
+.mb-2{margin-bottom:0.5rem}
+.mb-3{margin-bottom:0.75rem}
+.mb-4{margin-bottom:1rem}
+.ml-auto{margin-left:auto}
+.block{display:block}
+.inline-block{display:inline-block}
+.flex{display:flex}
+.table{display:table}
+.grid{display:grid}
+.hidden{display:none}
+.h-16{height:4rem}
+.h-5{height:1.25rem}
+.h-9{height:2.25rem}
+.h-\[130px\]{height:130px}
+.h-\[330px\]{height:330px}
+.h-\[380px\]{height:380px}
+.max-h-24{max-height:6rem}
+.max-h-full{max-height:100%}
+.min-h-\[1\.25rem\]{min-height:1.25rem}
+.min-h-\[2\.25rem\]{min-height:2.25rem}
+.min-h-\[2rem\]{min-height:2rem}
+.min-h-screen{min-height:100vh}
+.w-1\/3{width:33.333333%}
+.w-1\/5{width:20%}
+.w-1\/6{width:16.666667%}
+.w-10{width:2.5rem}
+.w-12{width:3rem}
+.w-14{width:3.5rem}
+.w-16{width:4rem}
+.w-2\/5{width:40%}
+.w-40{width:10rem}
+.w-6{width:1.5rem}
+.w-72{width:18rem}
+.w-80{width:20rem}
+.w-full{width:100%}
+.min-w-0{min-width:0px}
+.max-w-4xl{max-width:56rem}
+.max-w-\[1500px\]{max-width:1500px}
+.max-w-\[200px\]{max-width:200px}
+.max-w-sm{max-width:24rem}
+.flex-1{flex:1 1 0%}
+.shrink-0{flex-shrink:0}
+.cursor-pointer{cursor:pointer}
+.grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.flex-col{flex-direction:column}
+.flex-wrap{flex-wrap:wrap}
+.items-center{align-items:center}
+.items-start{align-items:flex-start}
+.justify-between{justify-content:space-between}
+.justify-center{justify-content:center}
+.justify-end{justify-content:flex-end}
+.self-start{align-self:flex-start}
+.gap-1{gap:0.25rem}
+.gap-2{gap:0.5rem}
+.gap-3{gap:0.75rem}
+.gap-4{gap:1rem}
+.gap-x-3{column-gap:0.75rem}
+.gap-x-4{column-gap:1rem}
+.gap-y-1{row-gap:0.25rem}
+.overflow-auto{overflow:auto}
+.overflow-y-auto{overflow-y:auto}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.whitespace-nowrap{white-space:nowrap}
+.select-none{-webkit-user-select:none;user-select:none}
+.rounded{border-radius:0.25rem}
+.border-collapse{border-collapse:collapse}
+.border{border-width:1px}
+.border-2{border-width:2px}
+.border-b{border-bottom-width:1px}
+.border-l{border-left-width:1px}
+.border-t{border-top-width:1px}
+.border-gray-300{border-color:#d1d5db}
+.border-gray-400{border-color:#9ca3af}
+.border-yellow-200{border-color:#fef08a}
+.bg-black{--tw-bg-opacity:1;background-color:rgb(0 0 0 / var(--tw-bg-opacity))}
+.bg-blue-600{--tw-bg-opacity:1;background-color:rgb(37 99 235 / var(--tw-bg-opacity))}
+.bg-gray-100{--tw-bg-opacity:1;background-color:rgb(243 244 246 / var(--tw-bg-opacity))}
+.bg-gray-200{--tw-bg-opacity:1;background-color:rgb(229 231 235 / var(--tw-bg-opacity))}
+.bg-gray-300{--tw-bg-opacity:1;background-color:rgb(209 213 219 / var(--tw-bg-opacity))}
+.bg-gray-50{--tw-bg-opacity:1;background-color:rgb(249 250 251 / var(--tw-bg-opacity))}
+.bg-green-600{--tw-bg-opacity:1;background-color:rgb(22 163 74 / var(--tw-bg-opacity))}
+.bg-red-600{--tw-bg-opacity:1;background-color:rgb(220 38 38 / var(--tw-bg-opacity))}
+.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255 / var(--tw-bg-opacity))}
+.bg-yellow-50{--tw-bg-opacity:1;background-color:rgb(254 252 232 / var(--tw-bg-opacity))}
+.bg-opacity-50{--tw-bg-opacity:0.5}
+.bg-opacity-60{--tw-bg-opacity:0.6}
+.p-1{padding:0.25rem}
+.p-2{padding:0.5rem}
+.p-3{padding:0.75rem}
+.p-4{padding:1rem}
+.p-5{padding:1.25rem}
+.p-6{padding:1.5rem}
+.px-1{padding-left:0.25rem;padding-right:0.25rem}
+.px-2{padding-left:0.5rem;padding-right:0.5rem}
+.px-3{padding-left:0.75rem;padding-right:0.75rem}
+.px-4{padding-left:1rem;padding-right:1rem}
+.py-0\.5{padding-top:0.125rem;padding-bottom:0.125rem}
+.py-1{padding-top:0.25rem;padding-bottom:0.25rem}
+.py-2{padding-top:0.5rem;padding-bottom:0.5rem}
+.py-3{padding-top:0.75rem;padding-bottom:0.75rem}
+.pr-2{padding-right:0.5rem}
+.pl-2{padding-left:0.5rem}
+.text-center{text-align:center}
+.text-left{text-align:left}
+.font-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace}
+.text-2xl{font-size:1.5rem;line-height:2rem}
+.text-5xl{font-size:3rem;line-height:1}
+.text-lg{font-size:1.125rem;line-height:1.75rem}
+.text-sm{font-size:0.875rem;line-height:1.25rem}
+.text-xs{font-size:0.75rem;line-height:1rem}
+.font-bold{font-weight:700}
+.font-normal{font-weight:400}
+.leading-none{line-height:1}
+.leading-relaxed{line-height:1.625}
+.leading-snug{line-height:1.375}
+.tracking-widest{letter-spacing:0.1em}
+.text-gray-400{color:#9ca3af}
+.text-gray-500{color:#6b7280}
+.text-gray-600{color:#4b5563}
+.text-gray-700{color:#374151}
+.text-red-600{color:#dc2626}
+.text-red-800{color:#991b1b}
+.text-white{color:#ffffff}
+.shadow-lg{box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1),0 4px 6px -4px rgb(0 0 0 / 0.1)}
+.shadow-xl{box-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1),0 8px 10px -6px rgb(0 0 0 / 0.1)}
+@media (min-width:640px){
+.sm\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (min-width:1024px){
+.lg\:flex{display:flex}
+.lg\:w-\[200px\]{width:200px}
+.lg\:w-\[480px\]{width:480px}
+.lg\:flex-row{flex-direction:row}
+}
+/*TWEND*/</style>
 </head>
 <body class="basic flex flex-col items-center justify-center min-h-screen gap-2">
 
@@ -138,17 +327,20 @@
             <div id="file-menu" class="hidden absolute left-0 top-full bg-white border border-gray-400 shadow-lg w-72 py-1 z-50">
                 <button class="menu-item" onclick="menuDo('save')">Save program (.asm)…</button>
                 <button class="menu-item" onclick="menuDo('load')">Open program (.asm)…</button>
-                <button class="menu-item" onclick="menuDo('export')">Export image for lab notebook (A4 landscape)…</button>
+                <button class="menu-item" onclick="menuDo('export')">Export image…</button>
                 <div class="border-t border-gray-300 my-1"></div>
                 <button class="menu-item" onclick="menuDo('savestate')">Save machine state</button>
                 <button class="menu-item" onclick="menuDo('loadstate')">Load machine state</button>
+                <button class="menu-item" onclick="menuDo('restore')">Restore last session</button>
                 <button class="menu-item" onclick="menuDo('new')">New (clear memory &amp; registers)</button>
                 <div class="border-t border-gray-300 my-1"></div>
-                <div id="storage-label" class="px-3 py-1 text-xs text-gray-500">Storage: checking…</div>
+                <div id="storage-label" class="px-3 py-1 text-xs text-gray-500">Work is auto-saved in this browser</div>
+                <div class="border-t border-gray-300 my-1"></div>
+                <div class="px-3 py-1 text-xs text-gray-500 leading-snug">8085 Microprocessor Simulator<br>Version <span id="app-version">2.5.0</span><br>Made by <b>Abhinav Dharmesh</b></div>
             </div>
         </div>
         <span class="ml-auto text-xs text-gray-500">8085 Microprocessor Simulator</span>
-        <input type="file" id="file-asm" accept=".asm,.txt,.s,text/*" class="hidden">
+        <input type="file" id="file-asm" class="hidden">
     </div>
 
     <div id="app-container" class="bg-gray-200 w-full max-w-[1500px] p-4 flex flex-col lg:flex-row gap-4 border border-gray-400 shadow-xl">
@@ -465,7 +657,7 @@
             </div>
         </div>
         <!-- ================= SHORTCUTS COLUMN ================= -->
-        <div class="lg:w-[200px] shrink-0 bg-white p-4 border border-gray-400 flex flex-col gap-2 self-start">
+        <div class="hidden lg:flex lg:w-[200px] shrink-0 bg-white p-4 border border-gray-400 flex-col gap-2 self-start">
             <h2 class="text-sm font-bold text-gray-500 bg-gray-300 p-1 -mt-4 -mx-4 border-b border-gray-400">Shortcuts</h2>
             <table class="w-full text-xs border-collapse">
                 <thead class="bg-gray-100"><tr><th class="border border-gray-300 p-1 text-left">KEY</th><th class="border border-gray-300 p-1 text-left">ACTION</th></tr></thead>
@@ -487,7 +679,6 @@
                 </tbody>
             </table>
             <div class="text-xs text-gray-500 leading-snug mt-1"><b>To enter a program:</b> Exam Mem → type address → Next → type a byte → Next … Then Reset, Go → address → Exec.</div>
-            <footer class="text-sm text-gray-300 py-1 text-center">Made by <b>Abhinav Dharmesh</b></footer>
         </div>
     </div>
 
@@ -525,7 +716,7 @@
     <div id="export-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
         <div class="bg-white rounded shadow-xl w-full max-w-4xl max-h-full overflow-y-auto p-4 flex flex-col gap-3">
             <div class="flex items-center justify-between">
-                <h3 class="text-lg font-bold">Export image for lab notebook</h3>
+                <h3 class="text-lg font-bold">Export image</h3>
                 <button onclick="closeExport()" class="text-2xl leading-none px-2" aria-label="Close">&times;</button>
             </div>
             <p class="text-xs text-gray-600">A4 landscape, as PNG or PDF. It captures what the Basic screen shows right now: ADDRESS and DATA displays, registers, flags, stack and the full instruction table. A long table flows into extra columns.</p>
@@ -540,6 +731,7 @@
                     <input id="exp-name" class="border border-gray-400 px-2 py-1 text-sm font-normal" maxlength="60" placeholder="8085-state" value="8085-state"></label>
             </div>
             <div id="exp-preview" class="flex flex-col gap-2 border border-gray-300 bg-gray-100 p-2"></div>
+            <p class="text-xs text-gray-500">If nothing downloads (some in-app browsers block it): press and hold the preview image and choose Save, use Share, or open this page in Chrome / Safari.</p>
             <div class="flex flex-wrap gap-2 justify-end">
                 <button id="exp-share" class="hidden border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="exportShare()">Share…</button>
                 <button class="border border-gray-400 py-2 px-4 rounded font-bold text-sm" onclick="closeExport()">Close</button>
@@ -549,56 +741,6 @@
         </div>
     </div>
 
-    <!-- Firebase Imports and Config (optional cloud save; falls back to this browser's storage) -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : '8085-simulator-default';
-        let db, auth, userId;
-
-        if (typeof __firebase_config !== 'undefined') {
-            try {
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                (async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                        userId = auth.currentUser.uid;
-                        console.log("Firebase Auth Success, UID:", userId);
-                        if (window.refreshStorageLabel) window.refreshStorageLabel();
-                    } catch (error) {
-                        console.error("Firebase Auth Error:", error);
-                    }
-                })();
-            } catch (e) {
-                console.error("Firebase Init Error:", e);
-            }
-        } else {
-            console.warn("No Firebase config found. Using browser storage only.");
-        }
-
-        window.cloudApi = {
-            ready: () => !!(db && userId),
-            async save(json) {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'states', 'currentState');
-                await setDoc(docRef, { json, timestamp: new Date().toISOString() });
-            },
-            async load() {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'states', 'currentState');
-                const snap = await getDoc(docRef);
-                return snap.exists() ? snap.data().json : null;
-            }
-        };
-        if (window.refreshStorageLabel) window.refreshStorageLabel();
-    </script>
 
     <!-- ===================== 8085 CORE (CPU + ASSEMBLER) ===================== -->
     <script id="core">
@@ -901,7 +1043,7 @@
             const t = next();
             if (t === undefined) throw new Error('Unexpected end of expression "' + str + '"');
             if (t === '(') { const v = expr(); if (next() !== ')') throw new Error('Missing ) in "' + str + '"'); return v; }
-            if (t[0] === "'" || t[0] === '"') { const body = t.slice(1, -1); return body.startsWith('\\') ? ({ n: 10, r: 13, t: 9, '0': 0 }[body[1]] ?? body.charCodeAt(1)) : body.charCodeAt(0); }
+            if (t[0] === "'" || t[0] === '"') { const body = t.slice(1, -1); return body.startsWith('\\') ? ((v => v === undefined ? body.charCodeAt(1) : v)({ n: 10, r: 13, t: 9, '0': 0 }[body[1]])) : body.charCodeAt(0); }
             const U = t.toUpperCase();
             if ((U === 'HIGH' || U === 'LOW') && peek() === '(') { next(); const v = expr(); if (next() !== ')') throw new Error('Missing )'); return U === 'HIGH' ? (v >> 8) & 255 : v & 255; }
             if (U === '$') return here;
@@ -1520,7 +1662,7 @@ WAIT:   HLT             ; sleep until an interrupt
     function clearTrace() { trace = []; renderTrace(); }
 
     // ---------- Assemble & load ----------
-    function assembleAndLoad() {
+    function assembleAndLoad(noDataMarks) {
         stopRun();
         const res = assemble($('editor').value);
         errLines = new Set(res.errors.map(e => e.line));
@@ -1531,7 +1673,7 @@ WAIT:   HLT             ; sleep until an interrupt
         }
         if (!res.count) { $('asm-msg').innerHTML = '<span class="msg-err">Nothing to assemble — the program is empty.</span>'; updateUI(); return false; }
         cpu.mem.fill(0);
-        touched.clear(); dataAddrs = new Set(res.dataBytes); res.bytes.forEach((v, a) => { cpu.mem[a] = v; touched.add(a); });
+        touched.clear(); dataAddrs = noDataMarks === true ? new Set() : new Set(res.dataBytes); res.bytes.forEach((v, a) => { cpu.mem[a] = v; touched.add(a); });
         progStart = res.start; restartCpu(progStart); trace = [];
         const syms = Object.keys(res.symbols).filter(k => !/^[0-9]/.test(k)).map(k => `${k}=${hex4(res.symbols[k])}`).join('  ');
         $('asm-msg').innerHTML = `<div class="msg-ok">Assembled ${res.count} byte(s), ${hex4(res.lo)}H–${hex4(res.hi)}H. PC set to ${hex4(progStart)}H. Ready to Run or Step.</div>` + (syms ? `<div class="text-gray-600">Symbols: ${escapeHtml(syms)}</div>` : '');
@@ -1748,7 +1890,7 @@ WAIT:   HLT             ; sleep until an interrupt
         trace = []; kit.mode = 'step'; listBase = cpu.pc; follow = true; $('list-follow').checked = true; prevRegs = {};
     }
     function storageMode() { return (window.cloudApi && window.cloudApi.ready()) ? 'cloud' : 'local'; }
-    window.refreshStorageLabel = () => { $('storage-label').textContent = storageMode() === 'cloud' ? 'Storage: Firebase cloud' : 'Storage: this browser (Firebase not configured)'; };
+    window.refreshStorageLabel = () => { $('storage-label').textContent = 'Work is auto-saved in this browser'; };
     async function saveState() {
         try {
             const json = serialize();
@@ -1772,6 +1914,7 @@ WAIT:   HLT             ; sleep until an interrupt
         else if (w === 'export') openExport();
         else if (w === 'savestate') saveState();
         else if (w === 'loadstate') loadState();
+        else if (w === 'restore') restoreSession();
         else if (w === 'new') newAll();
     }
     function anyModalOpen() { return ['custom-modal', 'save-modal', 'export-modal'].some(id => !$(id).classList.contains('hidden')); }
@@ -1781,16 +1924,20 @@ WAIT:   HLT             ; sleep until an interrupt
         return (s || fallback).slice(0, 60);
     }
     function downloadBlob(blob, name) {
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-        document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        try {
+            const url = URL.createObjectURL(blob), a = document.createElement('a');
+            a.href = url; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
+            document.body.appendChild(a); a.click();
+            setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 60000);
+            return true;
+        } catch (e) { showModal('This browser blocked the download. Open the page in Chrome or Safari, or use Share / press and hold the preview image.'); return false; }
     }
 
     // Program in memory -> assembler source (one DB line per instruction, with the disassembly as a comment)
     function memToAsm(name) {
         const sorted = Array.from(touched).sort((x, y) => x - y);
         const out = ['; ' + name + ' - saved from the 8085 Microprocessor Simulator (' + new Date().toLocaleString() + ')',
-                     '; Instructions are written as assembly; bytes entered as data are DB lines. Open it again with File > Open program.', ''];
+                     '; Instructions are written as assembly; bytes entered as data are DB lines. Open it again with File > Open program.', '; [data-aware format]', ''];
         let i = 0, expect = -1;
         while (i < sorted.length) {
             const a = sorted[i], d = disasm(a);
@@ -1833,7 +1980,9 @@ WAIT:   HLT             ; sleep until an interrupt
         const res = assemble(text);
         if (!res.ok) { showModal('Could not open "' + fname + '": ' + res.errors.slice(0, 3).map(e => 'line ' + (e.line + 1) + ': ' + e.msg).join('  |  ')); return; }
         if (!res.count) { showModal('"' + fname + '" contains no program bytes.'); return; }
-        $('editor').value = text; onEditorInput(); assembleAndLoad();
+        // Files from older versions (no marker) that are only DB bytes are programs, not data tables
+        const legacyAllDb = text.indexOf('[data-aware format]') < 0 && res.dataBytes.size >= res.count;
+        $('editor').value = text; onEditorInput(); assembleAndLoad(legacyAllDb);
         lastSaveName = cleanName(fname, 'program');
         setMsg('Opened ' + fname + ' (' + res.count + ' bytes at ' + hex4(res.lo) + 'H)');
     }
@@ -2014,12 +2163,15 @@ WAIT:   HLT             ; sleep until an interrupt
     }
     async function exportPdf() {
         if (!exportCanvases.length) return;
-        const jp = [];
-        for (const c of exportCanvases) {
-            const b = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.95));
-            jp.push({ bytes: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height });
-        }
-        downloadBlob(buildPdf(jp), cleanName($('exp-name').value, '8085-state') + '.pdf');
+        try {
+            const jp = [];
+            for (const c of exportCanvases) {
+                const b = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.95));
+                if (!b) throw new Error('this device could not create the PDF');
+                jp.push({ bytes: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height });
+            }
+            downloadBlob(buildPdf(jp), cleanName($('exp-name').value, '8085-state') + '.pdf');
+        } catch (e) { showModal('Could not create the PDF: ' + (e.message || e) + '. Try Download PNG instead.'); }
     }
 
     // student name / roll number are remembered in this browser
@@ -2044,20 +2196,25 @@ WAIT:   HLT             ; sleep until an interrupt
     async function renderExport() {
         const tok = ++exportToken;
         $('exp-preview').innerHTML = '<div class="text-xs text-gray-500 p-4">Rendering…</div>';
-        try { if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('100px "Share Tech Mono"'), new Promise(r => setTimeout(r, 900))]); } catch (e) {}
-        if (tok !== exportToken) return;
-        const canvases = buildExportCanvases({ title: $('exp-title').value, name: $('exp-student').value, roll: $('exp-roll').value });
-        exportCanvases = canvases;
-        const blobs = await Promise.all(canvases.map(c => new Promise(res => c.toBlob(res, 'image/png'))));
-        if (tok !== exportToken) return;
-        exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = blobs;
-        const box = $('exp-preview'); box.innerHTML = '';
-        blobs.forEach((b, i) => {
-            const u = URL.createObjectURL(b); exportUrls.push(u);
-            const im = document.createElement('img'); im.src = u; im.alt = 'Export preview, page ' + (i + 1); im.className = 'w-full border border-gray-400 bg-white'; box.appendChild(im);
-        });
-        let canShare = false; try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blobs[0]], 'x.png', { type: 'image/png' })] })); } catch (e) {}
-        $('exp-share').classList.toggle('hidden', !canShare);
+        try {
+            try { if (document.fonts && document.fonts.load) await Promise.race([document.fonts.load('100px "Share Tech Mono"'), new Promise(r => setTimeout(r, 900))]); } catch (e) {}
+            if (tok !== exportToken) return;
+            const canvases = buildExportCanvases({ title: $('exp-title').value, name: $('exp-student').value, roll: $('exp-roll').value });
+            exportCanvases = canvases;
+            const blobs = await Promise.all(canvases.map(c => new Promise(res => c.toBlob(res, 'image/png'))));
+            if (tok !== exportToken) return;
+            if (blobs.some(b => !b)) throw new Error('this device could not create the image');
+            exportUrls.forEach(u => URL.revokeObjectURL(u)); exportUrls = []; exportBlobs = blobs;
+            const box = $('exp-preview'); box.innerHTML = '';
+            blobs.forEach((b, i) => {
+                const u = URL.createObjectURL(b); exportUrls.push(u);
+                const im = document.createElement('img'); im.src = u; im.alt = 'Export preview, page ' + (i + 1); im.className = 'w-full border border-gray-400 bg-white'; box.appendChild(im);
+            });
+            let canShare = false; try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blobs[0]], 'x.png', { type: 'image/png' })] })); } catch (e) {}
+            $('exp-share').classList.toggle('hidden', !canShare);
+        } catch (e) {
+            if (tok === exportToken) $('exp-preview').innerHTML = '<div class="text-sm text-red-800 p-4">Could not create the image: ' + escapeHtml(e.message || String(e)) + '. Close this window and try again.</div>';
+        }
     }
     function exportFileName(i) { const base = cleanName($('exp-name').value, '8085-state'); return base + (exportBlobs.length > 1 ? '-' + (i + 1) : '') + '.png'; }
     function exportDownload() {
@@ -2067,6 +2224,26 @@ WAIT:   HLT             ; sleep until an interrupt
     async function exportShare() {
         try { await navigator.share({ files: exportBlobs.map((b, i) => new File([b], exportFileName(i), { type: 'image/png' })), title: cleanName($('exp-name').value, '8085-state') }); } catch (e) {}
     }
+
+    // ---------- Autosave, restore, error safety net ----------
+    const APP_VERSION = '2.5.0', AUTOSAVE_KEY = '8085sim_autosave';
+    let lastAutoSave = '';
+    function autoSave() {
+        try {
+            if (running || (!touched.size && !$('editor').value)) return;
+            const j = serialize();
+            if (j !== lastAutoSave) { localStorage.setItem(AUTOSAVE_KEY, j); lastAutoSave = j; }
+        } catch (e) {}
+    }
+    function restoreSession() {
+        let j = null; try { j = localStorage.getItem(AUTOSAVE_KEY); } catch (e) {}
+        if (!j) { showModal('There is no auto-saved session in this browser yet.'); return; }
+        try { deserialize(j); updateUI(); setMsg('Restored your last session'); } catch (e) { showModal('Could not restore the last session: ' + e.message); }
+    }
+    window.addEventListener('error', e => { try { setMsg('Unexpected error: ' + (e.message || 'see console') + '  (File > Restore last session recovers your work)'); } catch (_) {} });
+    window.addEventListener('unhandledrejection', e => { try { setMsg('Unexpected error: ' + ((e.reason && e.reason.message) || e.reason || '') ); } catch (_) {} });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) autoSave(); });
+    window.addEventListener('pagehide', autoSave);
 
     // ---------- Init & events ----------
     function init() {
@@ -2129,7 +2306,7 @@ WAIT:   HLT             ; sleep until an interrupt
                 else if (e.key.toLowerCase() === 't') { e.preventDefault(); toggleDataMode(); }
             }
         });
-        window.refreshStorageLabel();
+        window.refreshStorageLabel(); $('app-version').textContent = APP_VERSION; setInterval(autoSave, 3000);
         restartCpu(0); kit.mode = 'memAddr'; kit.addr = '0000';
         let m = 'basic'; try { m = localStorage.getItem('8085sim_mode') || 'basic'; } catch (e) {}
         setMode(m);

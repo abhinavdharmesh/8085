@@ -122,6 +122,9 @@
         .mode-btn.on { background: #2563eb; color: #fff; border-color: #1d4ed8; }
         .key-btn.kflash { background-color: #fde047 !important; color: #111827 !important; }
         #basic-body td, #stack-body td { border: 1px solid #d1d5db; padding: 2px 6px; height: 24px; }
+        .tb-btn.amber { background: #f59e0b; border-color: #b45309; color: #111; }
+        #basic-body tr.bdata td:nth-child(3) { color: #6b7280; font-style: italic; }
+        #basic-body td:nth-child(2) { cursor: pointer; }
         #basic-body tr.bcur { color: #2563eb; font-weight: 700; }
         #basic-body tr.flash { background: #fef08a; }
     </style>
@@ -135,7 +138,7 @@
             <div id="file-menu" class="hidden absolute left-0 top-full bg-white border border-gray-400 shadow-lg w-72 py-1 z-50">
                 <button class="menu-item" onclick="menuDo('save')">Save program (.asm)…</button>
                 <button class="menu-item" onclick="menuDo('load')">Open program (.asm)…</button>
-                <button class="menu-item" onclick="menuDo('export')">Export image</button>
+                <button class="menu-item" onclick="menuDo('export')">Export image for lab notebook (A4 landscape)…</button>
                 <div class="border-t border-gray-300 my-1"></div>
                 <button class="menu-item" onclick="menuDo('savestate')">Save machine state</button>
                 <button class="menu-item" onclick="menuDo('loadstate')">Load machine state</button>
@@ -427,6 +430,7 @@
                     <input id="row-num" type="number" min="1" class="reg-in" style="width:64px" onkeydown="if(event.key==='Enter'){showRow();event.stopPropagation();}">
                     <button class="tb-btn" onclick="showRow()">Show ROW</button>
                     <span class="ml-auto"></span>
+                    <button id="data-btn" class="tb-btn" title="While ON, bytes you enter are stored as data (arrays, constants) and are never read as instructions. You can also click an OPCODE cell to flip one row." onclick="toggleDataMode()">Data entry: OFF</button>
                     <button class="tb-btn" title="Clear all memory and registers" onclick="newAll()">New (clear all)</button>
                 </div>
                 <div id="basic-scroll" class="border-2 border-gray-300 h-[330px] overflow-y-auto relative bg-white">
@@ -474,6 +478,7 @@
                     <tr><td class="border border-gray-300 p-1"><kbd>G</kbd></td><td class="border border-gray-300 p-1">Go</td></tr>
                     <tr><td class="border border-gray-300 p-1"><kbd>Enter</kbd></td><td class="border border-gray-300 p-1">Exec</td></tr>
                     <tr><td class="border border-gray-300 p-1"><kbd>R</kbd></td><td class="border border-gray-300 p-1">Reset</td></tr>
+                    <tr><td class="border border-gray-300 p-1"><kbd>T</kbd></td><td class="border border-gray-300 p-1">Data entry on / off</td></tr>
                     <tr><td class="border border-gray-300 p-1"><kbd>Esc</kbd></td><td class="border border-gray-300 p-1">Kbint (stop)</td></tr>
                     <tr><td class="border border-gray-300 p-1"><kbd>S</kbd> <kbd>F10</kbd></td><td class="border border-gray-300 p-1">Step one instruction</td></tr>
                     <tr class="adv-only"><td class="border border-gray-300 p-1"><kbd>F5</kbd></td><td class="border border-gray-300 p-1">Run</td></tr>
@@ -520,7 +525,7 @@
     <div id="export-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-3">
         <div class="bg-white rounded shadow-xl w-full max-w-4xl max-h-full overflow-y-auto p-4 flex flex-col gap-3">
             <div class="flex items-center justify-between">
-                <h3 class="text-lg font-bold">Export image</h3>
+                <h3 class="text-lg font-bold">Export image for lab notebook</h3>
                 <button onclick="closeExport()" class="text-2xl leading-none px-2" aria-label="Close">&times;</button>
             </div>
             <p class="text-xs text-gray-600">A4 landscape, as PNG or PDF. It captures what the Basic screen shows right now: ADDRESS and DATA displays, registers, flags, stack and the full instruction table. A long table flows into extra columns.</p>
@@ -1002,9 +1007,11 @@
                 }
             } catch (e) { err(it.ln, e.message); }
         }
+        const dataBytes = new Set();
+        for (const it of items) if (it.kind === 'DB' || it.kind === 'DW') for (let k = 0; k < it.size; k++) dataBytes.add((it.addr + k) & 0xFFFF);
         errors.sort((a, b) => a.line - b.line);
         let lo = 0xFFFF, hi = 0; bytes.forEach((_, a) => { if (a < lo) lo = a; if (a > hi) hi = a; });
-        return { ok: errors.length === 0, errors, bytes, symbols, lineOfAddr, addrOfLine, start: startAddr === null ? 0x8000 : startAddr, lo, hi, count: bytes.size };
+        return { ok: errors.length === 0, errors, bytes, symbols, lineOfAddr, addrOfLine, dataBytes, start: startAddr === null ? 0x8000 : startAddr, lo, hi, count: bytes.size };
     }
 
     // ---------- Example programs ----------
@@ -1251,7 +1258,7 @@ WAIT:   HLT             ; sleep until an interrupt
 
     let lineOfAddr = {}, addrOfLine = {}, progStart = 0x8000, breakpoints = new Set(), errLines = new Set();
     let running = false, timer = null, skipBp = false, follow = true, listBase = 0x8000, memBase = 0x8000;
-    let basic = true, touched = new Set(), lastBasicHtml = '', lastBasicCur = -1;
+    let basic = true, dataMode = false, dataAddrs = new Set(), touched = new Set(), lastBasicHtml = '', lastBasicCur = -1;
     let activeTab = 'listing', trace = [], dirty = false, lastGutter = '', lastMsg = '';
     const kit = { mode: 'step', addr: '0000', data: '00', memAddr: 0, edited: false, regIdx: 0 };
     let prevRegs = {};
@@ -1372,7 +1379,7 @@ WAIT:   HLT             ; sleep until an interrupt
     }
     function commitEdit() {
         if (!kit.edited) return;
-        if (kit.mode === 'memData') { cpu.mem[kit.memAddr] = parseInt(kit.data, 16); touched.add(kit.memAddr); }
+        if (kit.mode === 'memData') { cpu.mem[kit.memAddr] = parseInt(kit.data, 16); touched.add(kit.memAddr); if (dataMode) dataAddrs.add(kit.memAddr); else dataAddrs.delete(kit.memAddr); }
         else if (kit.mode === 'reg') {
             const n = RLIST[kit.regIdx], is16 = n === 'SP' || n === 'PC';
             setRegByName(n, parseInt(is16 ? kit.addr : kit.data, 16));
@@ -1509,7 +1516,7 @@ WAIT:   HLT             ; sleep until an interrupt
     function restartProgram() {
         stopRun(); restartCpu(progStart); trace = []; kit.mode = 'step'; setMsg('Restarted: registers cleared, PC = ' + hex4(progStart)); listBase = progStart; updateUI();
     }
-    function clearMemory() { cpu.mem.fill(0); touched.clear(); setMsg('Memory cleared'); updateUI(); }
+    function clearMemory() { cpu.mem.fill(0); touched.clear(); dataAddrs.clear(); setMsg('Memory cleared'); updateUI(); }
     function clearTrace() { trace = []; renderTrace(); }
 
     // ---------- Assemble & load ----------
@@ -1524,7 +1531,7 @@ WAIT:   HLT             ; sleep until an interrupt
         }
         if (!res.count) { $('asm-msg').innerHTML = '<span class="msg-err">Nothing to assemble — the program is empty.</span>'; updateUI(); return false; }
         cpu.mem.fill(0);
-        touched.clear(); res.bytes.forEach((v, a) => { cpu.mem[a] = v; touched.add(a); });
+        touched.clear(); dataAddrs = new Set(res.dataBytes); res.bytes.forEach((v, a) => { cpu.mem[a] = v; touched.add(a); });
         progStart = res.start; restartCpu(progStart); trace = [];
         const syms = Object.keys(res.symbols).filter(k => !/^[0-9]/.test(k)).map(k => `${k}=${hex4(res.symbols[k])}`).join('  ');
         $('asm-msg').innerHTML = `<div class="msg-ok">Assembled ${res.count} byte(s), ${hex4(res.lo)}H–${hex4(res.hi)}H. PC set to ${hex4(progStart)}H. Ready to Run or Step.</div>` + (syms ? `<div class="text-gray-600">Symbols: ${escapeHtml(syms)}</div>` : '');
@@ -1629,6 +1636,7 @@ WAIT:   HLT             ; sleep until an interrupt
     // ---------- Basic mode ----------
     function setMode(m) {
         basic = m !== 'adv';
+        if (!basic && dataMode) { dataMode = false; updateDataBtn(); }
         document.body.classList.toggle('basic', basic);
         $('mode-basic').classList.toggle('on', basic); $('mode-adv').classList.toggle('on', !basic);
         try { localStorage.setItem('8085sim_mode', basic ? 'basic' : 'adv'); } catch (e) {}
@@ -1645,7 +1653,9 @@ WAIT:   HLT             ; sleep until an interrupt
         const sorted = Array.from(touched).sort((x, y) => x - y), rows = [];
         let i = 0;
         while (i < sorted.length && rows.length < 3000) {
-            const a = sorted[i], d = disasm(a);
+            const a = sorted[i];
+            if (dataAddrs.has(a)) { rows.push({ a, v: cpu.mem[a], t: 'DATA', n: '', data: true }); i++; continue; }
+            const d = disasm(a);
             for (let k = 0; k < d.len && a + k < 65536; k++) rows.push({ a: a + k, v: cpu.mem[a + k], t: k === 0 ? basicText(d) : '', n: k === 0 && d.e ? d.len : '' });
             const next = a + d.len; while (i < sorted.length && sorted[i] < next) i++;
         }
@@ -1655,7 +1665,7 @@ WAIT:   HLT             ; sleep until an interrupt
         const rows = basicRows();
         const cur = kit.mode === 'memData' ? kit.memAddr : cpu.pc, td = 'class="border border-gray-300"';
         let h = '';
-        for (const r of rows) h += `<tr data-a="${r.a}" class="${r.a === cur ? 'bcur' : ''}"><td>${hex4(r.a)}</td><td>${hex2(r.v)}</td><td>${escapeHtml(r.t)}</td><td>${r.n}</td></tr>`;
+        for (const r of rows) h += `<tr data-a="${r.a}" class="${r.a === cur ? 'bcur' : ''}${r.data ? ' bdata' : ''}"><td>${hex4(r.a)}</td><td>${hex2(r.v)}</td><td>${escapeHtml(r.t)}</td><td>${r.n}</td></tr>`;
         for (let k = rows.length; k < 14; k++) h += '<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>';
         if (h !== lastBasicHtml || cur !== lastBasicCur) {
             if (h !== lastBasicHtml) { $('basic-body').innerHTML = h; lastBasicHtml = h; }
@@ -1672,6 +1682,17 @@ WAIT:   HLT             ; sleep until an interrupt
         for (; n < 4; n++) sh += '<tr><td>&nbsp;</td><td></td></tr>';
         if ($('stack-body').innerHTML !== sh) $('stack-body').innerHTML = sh;
     }
+    function updateDataBtn() {
+        const b = $('data-btn'); b.textContent = 'Data entry: ' + (dataMode ? 'ON' : 'OFF'); b.classList.toggle('amber', dataMode);
+    }
+    function toggleDataMode() {
+        dataMode = !dataMode; updateDataBtn();
+        setMsg(dataMode ? 'Data entry ON: bytes you enter are stored as data, not instructions' : 'Data entry OFF: bytes are read as instructions again');
+    }
+    function toggleData(a) {
+        if (dataAddrs.has(a)) dataAddrs.delete(a); else dataAddrs.add(a);
+        lastBasicHtml = ''; updateUI(); setMsg(hex4(a) + ' is now ' + (dataAddrs.has(a) ? 'data' : 'an instruction'));
+    }
     function showRow() {
         const rows = $('basic-body').querySelectorAll('tr[data-a]'), n = parseInt($('row-num').value, 10);
         if (!rows.length) { setMsg('The debug table is empty — enter a program with Exam Mem first'); return; }
@@ -1681,7 +1702,7 @@ WAIT:   HLT             ; sleep until an interrupt
         tr.classList.add('flash'); setTimeout(() => tr.classList.remove('flash'), 1200);
     }
     function newAll() {
-        stopRun(); cpu.mem.fill(0); touched.clear(); restartCpu(0); trace = []; prevRegs = {};
+        stopRun(); cpu.mem.fill(0); touched.clear(); dataAddrs.clear(); dataMode = false; updateDataBtn(); restartCpu(0); trace = []; prevRegs = {};
         kit.mode = 'memAddr'; kit.addr = '0000'; kit.edited = false; lastBasicHtml = '';
         setMsg('Cleared: memory, registers and stack'); updateUI();
     }
@@ -1713,7 +1734,7 @@ WAIT:   HLT             ; sleep until an interrupt
         }
         return JSON.stringify({ v: 1, r: Array.from(cpu.r), sp: cpu.sp, pc: cpu.pc, f: getF(), ie: cpu.ie, m: [cpu.m55, cpu.m65, cpu.m75], p: [cpu.p55, cpu.p65, cpu.p75], sid: cpu.sid, sod: cpu.sod,
             halted: cpu.halted, t: cpu.tstates, n: cpu.icount, ioIn: Array.from(cpu.ioIn), ioOut: Array.from(cpu.ioOut), outUsed: Array.from(cpu.outUsed),
-            mem: ranges, src: $('editor').value, bps: Array.from(breakpoints), start: progStart });
+            mem: ranges, data: Array.from(dataAddrs), src: $('editor').value, bps: Array.from(breakpoints), start: progStart });
     }
     function deserialize(json) {
         const s = JSON.parse(json); stopRun();
@@ -1722,7 +1743,7 @@ WAIT:   HLT             ; sleep until an interrupt
         [cpu.m55, cpu.m65, cpu.m75] = s.m; [cpu.p55, cpu.p65, cpu.p75] = s.p; cpu.sid = s.sid; cpu.sod = s.sod;
         cpu.halted = !!s.halted; cpu.tstates = s.t; cpu.icount = s.n; cpu.ioIn.set(s.ioIn); cpu.ioOut.set(s.ioOut); cpu.outUsed = new Set(s.outUsed);
         cpu.trap = 0; cpu.intr = -1;
-        $('editor').value = s.src; breakpoints = new Set(s.bps || []); progStart = s.start;
+        $('editor').value = s.src; breakpoints = new Set(s.bps || []); dataAddrs = new Set(s.data || []); progStart = s.start;
         const res = assemble(s.src); lineOfAddr = res.lineOfAddr; addrOfLine = res.addrOfLine; errLines = new Set(); dirty = false;
         trace = []; kit.mode = 'step'; listBase = cpu.pc; follow = true; $('list-follow').checked = true; prevRegs = {};
     }
@@ -1769,13 +1790,17 @@ WAIT:   HLT             ; sleep until an interrupt
     function memToAsm(name) {
         const sorted = Array.from(touched).sort((x, y) => x - y);
         const out = ['; ' + name + ' - saved from the 8085 Microprocessor Simulator (' + new Date().toLocaleString() + ')',
-                     '; Each DB line is one instruction. Open it again with File > Open program.', ''];
+                     '; Instructions are written as assembly; bytes entered as data are DB lines. Open it again with File > Open program.', ''];
         let i = 0, expect = -1;
         while (i < sorted.length) {
             const a = sorted[i], d = disasm(a);
             if (a !== expect) out.push('        ORG ' + fmtH(a, 4));
-            const bytes = []; for (let k = 0; k < d.len && a + k < 65536; k++) bytes.push(fmtH(cpu.mem[a + k], 2));
-            out.push(('        DB ' + bytes.join(',')).padEnd(32) + '; ' + hex4(a) + '  ' + (d.e ? d.text : 'data'));
+            if (dataAddrs.has(a) || !d.e) {
+                out.push(('        DB ' + fmtH(cpu.mem[a], 2)).padEnd(32) + '; ' + hex4(a) + '  data');
+                expect = a + 1; i++; continue;
+            }
+            const bytes = []; for (let k = 0; k < d.len && a + k < 65536; k++) bytes.push(hex2(cpu.mem[a + k]));
+            out.push(('        ' + d.text).padEnd(32) + '; ' + hex4(a) + '  ' + bytes.join(' '));
             expect = a + d.len; while (i < sorted.length && sorted[i] < expect) i++;
         }
         return out.join('\n') + '\n';
@@ -2064,6 +2089,12 @@ WAIT:   HLT             ; sleep until an interrupt
             const a = addrOfLine[+g.dataset.ln]; if (a === undefined) return;
             if (breakpoints.has(a)) breakpoints.delete(a); else breakpoints.add(a); updateUI();
         });
+        $('basic-body').addEventListener('click', e => {
+            const td = e.target.closest('td'), tr = e.target.closest('tr');
+            if (!td || !tr || !tr.dataset.a || td.cellIndex !== 1) return;
+            if (!tr.children[2].textContent) { setMsg('That byte belongs to the instruction above it'); return; }
+            toggleData(+tr.dataset.a);
+        });
         $('tabs').addEventListener('click', e => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab); });
         $('listing-body').addEventListener('click', e => {
             const tr = e.target.closest('tr'); if (!tr) return; const a = +tr.dataset.a;
@@ -2095,6 +2126,7 @@ WAIT:   HLT             ; sleep until an interrupt
             else {
                 const km = { m: ['ExamMem', 'Exam Mem'], x: ['ExamReg', 'Exam Reg'], g: ['Go', 'Go'], r: ['Reset', 'Reset'], s: ['Step', ''] }[e.key.toLowerCase()];
                 if (km) { e.preventDefault(); flashKey(km[1]); handleCommand(km[0]); }
+                else if (e.key.toLowerCase() === 't') { e.preventDefault(); toggleDataMode(); }
             }
         });
         window.refreshStorageLabel();
